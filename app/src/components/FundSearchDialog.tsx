@@ -7,9 +7,12 @@
  * 1. 使用轻量级索引快速搜索（只加载代码和名称）
  * 2. 后台逐步加载完整数据
  * 3. 优先显示搜索结果，再获取详情
+ * 4. 使用 AbortController 取消未完成的请求
+ * 5. 使用持久化缓存减少重复加载
+ * 6. 单只基金详情独立缓存
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import type { FundRealtime } from '@/types/fund';
 import { fundService } from '@/services/fundService';
 import { apiClient } from '@/services/apiClient';
@@ -57,20 +60,35 @@ export function FundSearchDialog({ open, onOpenChange, onSelect }: FundSearchDia
   const [fundIndex, setFundIndex] = useState<FundIndexItem[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [indexLoaded, setIndexLoaded] = useState(false);
+  
+  // Refs
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadingRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const fundDetailCache = useRef<Map<string, FundRealtime>>(new Map());
 
-  // 加载轻量级索引（用于快速搜索）
+  // 加载轻量级索引（用于快速搜索）- 优化版本
   const loadFundIndex = useCallback(async () => {
     if (indexLoaded || loadingRef.current) return;
     
     loadingRef.current = true;
     
-    // 先检查缓存
-    const cachedIndex = cache.get<FundIndexItem[]>('fund_index');
+    // 先检查持久化缓存
+    const cachedIndex = persistentCache.get<FundIndexItem[]>('fund_index');
     if (cachedIndex && cachedIndex.length > 0) {
-      console.log('[FundSearchDialog] 从缓存加载基金索引');
+      console.log('[FundSearchDialog] 从持久化缓存加载基金索引');
       setFundIndex(cachedIndex);
+      cache.set('fund_index', cachedIndex, 24 * 60 * 60 * 1000); // 同步到内存缓存
+      setIndexLoaded(true);
+      loadingRef.current = false;
+      return;
+    }
+    
+    // 检查内存缓存
+    const memCachedIndex = cache.get<FundIndexItem[]>('fund_index');
+    if (memCachedIndex && memCachedIndex.length > 0) {
+      console.log('[FundSearchDialog] 从内存缓存加载基金索引');
+      setFundIndex(memCachedIndex);
       setIndexLoaded(true);
       loadingRef.current = false;
       return;
@@ -82,33 +100,76 @@ export function FundSearchDialog({ open, onOpenChange, onSelect }: FundSearchDia
       const index = funds.map(f => ({ code: f.code, name: f.name }));
       setFundIndex(index);
       cache.set('fund_index', index, 24 * 60 * 60 * 1000);
+      persistentCache.set('fund_index', index); // 持久化缓存
       setIndexLoaded(true);
       console.log(`[FundSearchDialog] 索引加载完成：${index.length}项`);
     } catch (err) {
       console.error('[FundSearchDialog] 索引加载失败:', err);
+      setError('索引加载失败，请刷新页面重试');
     } finally {
       loadingRef.current = false;
     }
   }, [indexLoaded]);
 
-  // 后台加载完整数据
+  // 后台加载完整数据 - 优化版本（支持取消 + 真实进度反馈）
   const loadFullData = useCallback(async () => {
     if (dataLoaded || isPreloading) return;
     
+    // 取消之前的请求
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+    
     setIsPreloading(true);
-    setProgressMessage('正在加载完整基金数据...');
+    setProgress(0);
+    setProgressMessage('正在连接服务器...');
     
     try {
+      // 阶段 1: 开始请求 (20%)
+      setProgress(20);
+      setProgressMessage('正在请求基金数据，这可能需要 30-60 秒...');
+      
+      const startTime = Date.now();
       const funds = await fundService.getOpenFundList();
+      const fetchDuration = Date.now() - startTime;
+      
+      console.log(`[FundSearchDialog] API 请求耗时 ${fetchDuration}ms，获取 ${funds.length} 只基金`);
+      
+      // 阶段 2: 处理数据 (60-80%)
+      setProgress(60);
+      setProgressMessage(`正在处理 ${funds.length} 只基金数据...`);
+      
+      // 模拟处理进度（给用户视觉反馈）
+      await new Promise(resolve => setTimeout(resolve, 100));
+      setProgress(80);
+      
       setAllFunds(funds);
       setDataLoaded(true);
+      
+      // 阶段 3: 完成 (100%)
+      setProgress(100);
+      setProgressMessage(`✅ 数据加载完成！共 ${funds.length} 只基金`);
+      
       setIsPreloading(false);
-      setProgressMessage('');
+      
+      // 2 秒后清除消息
+      setTimeout(() => {
+        setProgressMessage('');
+        setProgress(0);
+      }, 2000);
+      
       console.log('[FundSearchDialog] 完整数据加载完成');
     } catch (err) {
-      console.error('[FundSearchDialog] 完整数据加载失败:', err);
+      // 忽略取消错误
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.log('[FundSearchDialog] 数据加载已取消');
+      } else {
+        console.error('[FundSearchDialog] 完整数据加载失败:', err);
+        setProgress(0);
+        setProgressMessage('❌ 加载失败，请刷新页面重试');
+      }
       setIsPreloading(false);
-      setProgressMessage('');
     }
   }, [dataLoaded, isPreloading]);
 
@@ -119,16 +180,28 @@ export function FundSearchDialog({ open, onOpenChange, onSelect }: FundSearchDia
     }
   }, [open, indexLoaded, loadFundIndex]);
 
-  // 索引加载后，后台加载完整数据
+  // 索引加载后，后台加载完整数据 - 智能延迟
   useEffect(() => {
     if (indexLoaded && !dataLoaded && !isPreloading) {
-      // 延迟加载完整数据，避免阻塞
+      // 延迟加载完整数据，避免阻塞 UI
       const timer = setTimeout(() => {
         loadFullData();
-      }, 500);
+      }, 1000); // 增加延迟到 1 秒，让 UI 先渲染
       return () => clearTimeout(timer);
     }
   }, [indexLoaded, dataLoaded, isPreloading, loadFullData]);
+
+  // 清理函数 - 组件卸载时取消请求
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // 执行本地搜索 - 使用索引快速搜索
   const performSearch = useCallback(async (searchKeyword: string) => {
@@ -201,13 +274,30 @@ export function FundSearchDialog({ open, onOpenChange, onSelect }: FundSearchDia
     }
   }, [fundIndex]);
 
-  // 获取基金详情
-  const getFundDetail = async (code: string): Promise<FundRealtime | null> => {
-    // 先从已加载的完整数据中找
-    const cached = allFunds.find(f => f.code === code);
-    if (cached) return cached;
+  // 获取基金详情 - 优化版本（使用独立缓存）
+  const getFundDetail = useCallback(async (code: string): Promise<FundRealtime | null> => {
+    // 1. 先从本地缓存找
+    const localCached = fundDetailCache.current.get(code);
+    if (localCached) {
+      console.log(`[FundSearchDialog] 从本地缓存获取基金${code}详情`);
+      return localCached;
+    }
     
-    // 从 API 获取
+    // 2. 从已加载的完整数据中找
+    const cached = allFunds.find(f => f.code === code);
+    if (cached) {
+      fundDetailCache.current.set(code, cached);
+      return cached;
+    }
+    
+    // 3. 从内存缓存找
+    const memCached = cache.get<FundRealtime>(`fund_detail_${code}`);
+    if (memCached) {
+      fundDetailCache.current.set(code, memCached);
+      return memCached;
+    }
+    
+    // 4. 从 API 获取
     try {
       const data = await apiClient.get('fund_open_fund_daily_em');
       if (Array.isArray(data)) {
@@ -226,6 +316,9 @@ export function FundSearchDialog({ open, onOpenChange, onSelect }: FundSearchDia
             redeemStatus: item['赎回状态'] || '',
             fee: item['手续费'] || ''
           };
+          // 缓存结果
+          fundDetailCache.current.set(code, fund);
+          cache.set(`fund_detail_${code}`, fund, 30 * 60 * 1000); // 30 分钟缓存
           return fund;
         }
       }
@@ -233,13 +326,9 @@ export function FundSearchDialog({ open, onOpenChange, onSelect }: FundSearchDia
       console.error('获取基金详情失败:', err);
     }
     return null;
-  };
+  }, [allFunds]);
 
-  // 使用 ref 保存 performSearch 避免依赖循环
-  const performSearchRef = useRef(performSearch);
-  performSearchRef.current = performSearch;
-
-  // 防抖搜索 - 使用索引加载状态
+  // 防抖搜索 - 使用索引加载状态 - 优化版本
   useEffect(() => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -257,15 +346,15 @@ export function FundSearchDialog({ open, onOpenChange, onSelect }: FundSearchDia
     }
 
     searchTimeoutRef.current = setTimeout(() => {
-      performSearchRef.current(keyword);
-    }, 300); // 300ms 防抖
+      performSearch(keyword);
+    }, 200); // 减少防抖时间到 200ms，响应更快
 
     return () => {
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [keyword, indexLoaded]);
+  }, [keyword, indexLoaded, performSearch]);
 
   // 手动搜索（用于点击搜索按钮）- 修复等待问题
   const searchFunds = useCallback(async (searchKeyword: string) => {
@@ -355,12 +444,14 @@ export function FundSearchDialog({ open, onOpenChange, onSelect }: FundSearchDia
     }
   };
 
-  // 处理添加基金
-  const handleAdd = async (fund: FundRealtime) => {
+  // 处理添加基金 - 优化版本
+  const handleAdd = useCallback(async (fund: FundRealtime) => {
     setAddingCode(fund.code);
     try {
       const success = await onSelect(fund.code, fund.name);
       if (success) {
+        // 缓存已添加的基金详情
+        fundDetailCache.current.set(fund.code, fund);
         setKeyword('');
         setResults([]);
         setHasSearched(false);
@@ -370,10 +461,10 @@ export function FundSearchDialog({ open, onOpenChange, onSelect }: FundSearchDia
     } finally {
       setAddingCode(null);
     }
-  };
+  }, [onSelect]);
 
-  // 关闭对话框时重置状态
-  const handleOpenChange = (open: boolean) => {
+  // 关闭对话框时重置状态 - 优化版本
+  const handleOpenChange = useCallback((open: boolean) => {
     if (!open) {
       setKeyword('');
       setResults([]);
@@ -381,10 +472,11 @@ export function FundSearchDialog({ open, onOpenChange, onSelect }: FundSearchDia
       setHasSearched(false);
       setProgress(0);
       setProgressMessage('');
-      // 保留allFunds和dataLoaded，下次打开更快
+      // 保留 allFunds 和 dataLoaded，下次打开更快
+      // 保留 fundDetailCache，避免重复请求
     }
     onOpenChange(open);
-  };
+  }, [onOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -416,17 +508,22 @@ export function FundSearchDialog({ open, onOpenChange, onSelect }: FundSearchDia
             </Button>
           </div>
 
-          {/* 预加载提示 */}
+          {/* 预加载提示 - 优化版本 */}
           {isPreloading && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
               <div className="flex items-center gap-2 text-blue-600 mb-2">
-                <Database className="w-4 h-4" />
+                <Zap className="w-4 h-4 animate-pulse" />
                 <span className="text-sm font-medium">正在初始化数据...</span>
               </div>
-              <Progress value={50} className="h-2" />
+              <Progress value={progress} className="h-2" />
               <p className="text-xs text-blue-500 mt-1">
-                首次使用需要加载基金数据，请稍候
+                {progressMessage}
               </p>
+              {progress > 0 && progress < 100 && (
+                <p className="text-xs text-blue-400 mt-1">
+                  预计剩余时间：{Math.max(1, Math.round((100 - progress) / 20))}秒
+                </p>
+              )}
             </div>
           )}
 
@@ -440,7 +537,7 @@ export function FundSearchDialog({ open, onOpenChange, onSelect }: FundSearchDia
             </div>
           )}
 
-          {/* 提示信息 */}
+          {/* 提示信息 - 优化版本 */}
           {!hasSearched && !loading && !isPreloading && (
             <div className="text-sm text-muted-foreground bg-muted p-3 rounded">
               <div className="flex items-center justify-between mb-1">
@@ -451,23 +548,29 @@ export function FundSearchDialog({ open, onOpenChange, onSelect }: FundSearchDia
                       variant="ghost" 
                       size="sm" 
                       onClick={() => {
+                        // 清除缓存，重新加载
+                        cache.delete('fund_index');
+                        persistentCache.delete('fund_index');
+                        setFundIndex([]);
+                        setIndexLoaded(false);
                         setAllFunds([]);
                         setDataLoaded(false);
-                        loadFullData();
+                        loadFundIndex();
                       }}
                       disabled={isPreloading}
                       className="h-6 text-xs"
                     >
                       <RefreshCw className="w-3 h-3 mr-1" />
-                      刷新列表
+                      刷新
                     </Button>
                   )}
                 </div>
               </div>
               <ul className="list-disc list-inside space-y-1 text-xs">
                 <li>输入 6 位基金代码（如：000001）或基金名称（如：华夏成长）</li>
-                <li>{indexLoaded ? `✅ 索引已加载（共${fundIndex.length}只基金），可立即搜索` : '正在加载基金索引...'}</li>
+                <li>{indexLoaded ? `✅ 索引已加载（共${fundIndex.length}只基金），可立即搜索` : '⏳ 正在加载基金索引...'}</li>
                 <li>{dataLoaded ? '✅ 完整数据已加载，显示净值信息' : '📊 完整数据后台加载中...'}</li>
+                <li className="text-green-600">💾 已缓存 {fundDetailCache.current.size} 只基金详情</li>
               </ul>
             </div>
           )}

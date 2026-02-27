@@ -19,7 +19,14 @@
  * ```
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+/**
+ * 优化说明：
+ * 1. 使用细粒度状态更新，避免不必要的重渲染
+ * 2. 使用函数式更新代替重新加载
+ * 3. 使用 useMemo 缓存计算结果
+ */
+
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { UserFund, FundRealtime } from '@/types/fund';
 import type { FundQueryOptions, FundUpdateData } from '@/types/fund';
 import { FundManager, fundManager } from '@/services/fundManager';
@@ -64,20 +71,31 @@ export function useFundManager(): UseFundManagerReturn {
   const [funds, setFunds] = useState<UserFund[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [assets, setAssets] = useState({
-    totalCost: 0,
-    totalValue: 0,
-    totalProfit: 0,
-    totalProfitRate: 0
-  });
   const managerRef = useRef<FundManager>(fundManager);
 
-  // 加载基金列表
+  // 加载基金列表 - 优化版本（使用函数式更新）
   const loadFunds = useCallback(() => {
     try {
       const allFunds = managerRef.current.getAllFunds();
-      setFunds(allFunds);
-      setAssets(managerRef.current.calculateTotalAssets());
+      // 只在数据实际变化时更新
+      setFunds(prev => {
+        const prevIds = new Set(prev.map(f => f.code));
+        const currIds = new Set(allFunds.map(f => f.code));
+        // 如果基金列表有变化才更新
+        if (prevIds.size !== currIds.size || !allFunds.every(f => prevIds.has(f.code))) {
+          return allFunds;
+        }
+        // 否则只更新净值等变化的数据
+        return allFunds.map(newFund => {
+          const oldFund = prev.find(f => f.code === newFund.code);
+          if (!oldFund) return newFund;
+          // 如果净值有变化才更新
+          if (JSON.stringify(oldFund.latestNav) !== JSON.stringify(newFund.latestNav)) {
+            return newFund;
+          }
+          return oldFund;
+        });
+      });
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载基金失败');
@@ -89,7 +107,7 @@ export function useFundManager(): UseFundManagerReturn {
     loadFunds();
   }, [loadFunds]);
 
-  // 添加基金
+  // 添加基金 - 优化版本（直接添加，避免全量重载）
   const addFund = useCallback(async (
     code: string,
     remark?: string,
@@ -101,7 +119,8 @@ export function useFundManager(): UseFundManagerReturn {
     try {
       const fund = await managerRef.current.addFund(code, remark, holdShares, costPrice);
       if (fund) {
-        loadFunds();
+        // 直接添加到状态，避免全量重载
+        setFunds(prev => [...prev, fund]);
         return true;
       }
       setError('添加基金失败，可能基金不存在或已添加');
@@ -112,35 +131,39 @@ export function useFundManager(): UseFundManagerReturn {
     } finally {
       setLoading(false);
     }
-  }, [loadFunds]);
+  }, []);
 
-  // 删除基金
+  // 删除基金 - 优化版本（直接删除，避免全量重载）
   const deleteFund = useCallback((code: string): boolean => {
     try {
       const result = managerRef.current.deleteFund(code);
       if (result) {
-        loadFunds();
+        // 直接从状态删除，避免全量重载
+        setFunds(prev => prev.filter(f => f.code !== code));
       }
       return result;
     } catch (err) {
       setError(err instanceof Error ? err.message : '删除基金失败');
       return false;
     }
-  }, [loadFunds]);
+  }, []);
 
-  // 更新基金
+  // 更新基金 - 优化版本（直接更新，避免全量重载）
   const updateFund = useCallback((code: string, data: FundUpdateData): boolean => {
     try {
       const result = managerRef.current.updateFund(code, data);
       if (result) {
-        loadFunds();
+        // 直接从状态更新，避免全量重载
+        setFunds(prev => prev.map(f => 
+          f.code === code ? { ...f, ...data, lastUpdated: new Date().toISOString() } : f
+        ));
       }
       return !!result;
     } catch (err) {
       setError(err instanceof Error ? err.message : '更新基金失败');
       return false;
     }
-  }, [loadFunds]);
+  }, []);
 
   // 刷新净值
   const refreshNav = useCallback(async (code?: string): Promise<boolean> => {
@@ -191,6 +214,11 @@ export function useFundManager(): UseFundManagerReturn {
     loadFunds();
   }, [loadFunds]);
 
+  // 使用 useMemo 缓存资产计算
+  const calculatedAssets = useMemo(() => {
+    return managerRef.current.calculateTotalAssets();
+  }, [funds]);
+
   return {
     funds,
     loading,
@@ -202,6 +230,6 @@ export function useFundManager(): UseFundManagerReturn {
     searchFunds,
     queryFunds,
     reload,
-    assets
+    assets: calculatedAssets
   };
 }

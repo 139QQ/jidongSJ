@@ -2,9 +2,14 @@
  * 基金列表组件
  * @module components/FundList
  * @description 展示用户关注的基金列表，支持增删改查操作
+ * 
+ * 优化说明：
+ * 1. 使用 React.memo 优化子组件，避免不必要的重渲染
+ * 2. 使用 useMemo 缓存计算结果
+ * 3. 使用 useCallback 稳定回调函数引用
  */
 
-import { useState } from 'react';
+import { useState, useMemo, useCallback, memo } from 'react';
 import type { UserFund } from '@/types/fund';
 import { useFundManager } from '@/hooks/useFundManager';
 import { Button } from '@/components/ui/button';
@@ -17,6 +22,162 @@ import { FundDetailDialog } from './FundDetailDialog';
 import { ErrorAlert } from './ErrorAlert';
 import { LoadingSpinner } from './LoadingSpinner';
 import { toast } from 'sonner';
+
+/** 基金项属性 */
+interface FundItemProps {
+  fund: UserFund;
+  onRefresh: (code: string) => void;
+  onDelete: (code: string) => void;
+  onDetail: (fund: UserFund) => void;
+  loading: boolean;
+}
+
+/**
+ * 基金项组件 - 使用 React.memo 优化
+ * 只在 prop 变化时重新渲染
+ */
+const FundItem = memo<FundItemProps>(({ fund, onRefresh, onDelete, onDetail, loading }) => {
+  // 使用 useMemo 缓存收益计算
+  const profitData = useMemo(() => {
+    const hasHoldings = fund.holdShares && fund.costPrice;
+    const holdShares = fund.holdShares || 0;
+    const costPrice = fund.costPrice || 0;
+    const currentValue = hasHoldings && fund.latestNav 
+      ? holdShares * fund.latestNav.unitNav 
+      : 0;
+    const costValue = hasHoldings ? holdShares * costPrice : 0;
+    const profit = currentValue - costValue;
+    const profitRate = costValue > 0 ? (profit / costValue) * 100 : 0;
+    return { hasHoldings, holdShares, costPrice, currentValue, costValue, profit, profitRate };
+  }, [fund.holdShares, fund.costPrice, fund.latestNav]);
+
+  const getProfitColor = profitData.profitRate >= 0 ? 'text-red-500' : 'text-green-500';
+  const ProfitIcon = profitData.profitRate >= 0 ? TrendingUp : TrendingDown;
+
+  return (
+    <div 
+      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+      onClick={() => onDetail(fund)}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-medium truncate">{fund.name}</span>
+          <Badge variant="secondary" className="text-xs flex-shrink-0">{fund.code}</Badge>
+          <Badge variant="outline" className="text-xs flex-shrink-0">{fund.type}</Badge>
+        </div>
+        <div className="text-sm text-muted-foreground mt-1 truncate">
+          {fund.latestNav ? (
+            <span>净值：{fund.latestNav.unitNav.toFixed(4)} ({fund.latestNav.date})</span>
+          ) : (
+            <span>暂无净值数据</span>
+          )}
+        </div>
+      </div>
+      
+      <div className="text-right mx-4 flex-shrink-0">
+        {profitData.hasHoldings ? (
+          <>
+            <div className="font-medium">{profitData.holdShares} 份</div>
+            <div className="text-sm text-muted-foreground">
+              成本：¥{profitData.costPrice?.toFixed(4)}
+            </div>
+          </>
+        ) : (
+          <div className="text-sm text-muted-foreground">未持有</div>
+        )}
+      </div>
+
+      {profitData.hasHoldings && (
+        <div className={`text-right w-24 flex-shrink-0 ${getProfitColor}`}>
+          <div className="font-medium flex items-center justify-end gap-1">
+            <ProfitIcon className="w-4 h-4" />
+            {profitData.profit >= 0 ? '+' : ''}¥{profitData.profit.toFixed(2)}
+          </div>
+          <div className="text-sm">
+            {profitData.profitRate >= 0 ? '+' : ''}{profitData.profitRate.toFixed(2)}%
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+        <Button 
+          variant="ghost" 
+          size="icon"
+          onClick={() => onRefresh(fund.code)}
+          disabled={loading}
+          className="w-8 h-8"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+        </Button>
+        <Button 
+          variant="ghost" 
+          size="icon"
+          onClick={() => onDelete(fund.code)}
+          className="w-8 h-8"
+        >
+          <Trash2 className="w-4 h-4 text-destructive" />
+        </Button>
+      </div>
+    </div>
+  );
+});
+
+FundItem.displayName = 'FundItem';
+
+/**
+ * 资产概览组件 - 使用 memo 优化
+ */
+interface AssetOverviewProps {
+  assets: {
+    totalCost: number;
+    totalValue: number;
+    totalProfit: number;
+    totalProfitRate: number;
+  };
+}
+
+const AssetOverview = memo<AssetOverviewProps>(({ assets }) => {
+  const getProfitColor = assets.totalProfitRate >= 0 ? 'text-red-500' : 'text-green-500';
+  const ProfitIcon = assets.totalProfitRate >= 0 ? TrendingUp : TrendingDown;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <DollarSign className="w-5 h-5" />
+          资产概览
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="text-center p-4 bg-muted rounded-lg">
+            <div className="text-sm text-muted-foreground">总成本</div>
+            <div className="text-xl font-bold">¥{assets.totalCost.toFixed(2)}</div>
+          </div>
+          <div className="text-center p-4 bg-muted rounded-lg">
+            <div className="text-sm text-muted-foreground">总市值</div>
+            <div className="text-xl font-bold">¥{assets.totalValue.toFixed(2)}</div>
+          </div>
+          <div className="text-center p-4 bg-muted rounded-lg">
+            <div className="text-sm text-muted-foreground">总收益</div>
+            <div className={`text-xl font-bold ${getProfitColor}`}>
+              {assets.totalProfit >= 0 ? '+' : ''}¥{assets.totalProfit.toFixed(2)}
+            </div>
+          </div>
+          <div className="text-center p-4 bg-muted rounded-lg">
+            <div className="text-sm text-muted-foreground">收益率</div>
+            <div className={`text-xl font-bold flex items-center justify-center gap-1 ${getProfitColor}`}>
+              <ProfitIcon className="w-4 h-4" />
+              {assets.totalProfitRate >= 0 ? '+' : ''}{assets.totalProfitRate.toFixed(2)}%
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+});
+
+AssetOverview.displayName = 'AssetOverview';
 
 /**
  * 基金列表组件
@@ -39,66 +200,54 @@ export function FundList() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
-  // 过滤基金
-  const filteredFunds = searchKeyword 
-    ? queryFunds({ keyword: searchKeyword })
-    : funds;
+  // 使用 useMemo 缓存过滤结果
+  const filteredFunds = useMemo(() => {
+    if (!searchKeyword) return funds;
+    return queryFunds({ keyword: searchKeyword });
+  }, [searchKeyword, funds, queryFunds]);
 
-  // 处理添加基金
-  const handleAddFund = async (code: string, name: string) => {
+  // 使用 useCallback 稳定回调函数
+  const handleAddFund = useCallback(async (code: string, name: string) => {
     try {
       const success = await addFund(code, name);
       if (success) {
         setIsSearchOpen(false);
-        toast.success(`成功添加基金: ${name}`);
+        toast.success(`成功添加基金：${name}`);
       } else {
         toast.error('添加基金失败，基金可能不存在或已添加');
       }
       return success;
     } catch (err) {
-      toast.error('添加基金失败: ' + (err instanceof Error ? err.message : '未知错误'));
+      toast.error('添加基金失败：' + (err instanceof Error ? err.message : '未知错误'));
       return false;
     }
-  };
+  }, [addFund]);
 
-  // 处理删除基金
-  const handleDeleteFund = (code: string) => {
+  const handleDeleteFund = useCallback((code: string) => {
     if (confirm('确定要删除这只基金吗？')) {
       try {
         deleteFund(code);
         toast.success('基金已删除');
       } catch (err) {
-        toast.error('删除失败: ' + (err instanceof Error ? err.message : '未知错误'));
+        toast.error('删除失败：' + (err instanceof Error ? err.message : '未知错误'));
       }
     }
-  };
+  }, [deleteFund]);
 
-  // 处理刷新净值
-  const handleRefreshNav = async (code?: string) => {
+  const handleRefreshNav = useCallback(async (code?: string) => {
     try {
       toast.info(code ? '正在刷新基金净值...' : '正在刷新所有基金净值...');
       await refreshNav(code);
       toast.success('净值刷新完成');
     } catch (err) {
-      toast.error('刷新失败: ' + (err instanceof Error ? err.message : '未知错误'));
+      toast.error('刷新失败：' + (err instanceof Error ? err.message : '未知错误'));
     }
-  };
+  }, [refreshNav]);
 
-  // 打开基金详情
-  const openFundDetail = (fund: UserFund) => {
+  const openFundDetail = useCallback((fund: UserFund) => {
     setSelectedFund(fund);
     setIsDetailOpen(true);
-  };
-
-  // 计算收益颜色
-  const getProfitColor = (profitRate: number) => {
-    return profitRate >= 0 ? 'text-red-500' : 'text-green-500';
-  };
-
-  // 计算收益图标
-  const getProfitIcon = (profitRate: number) => {
-    return profitRate >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />;
-  };
+  }, []);
 
   if (loading && funds.length === 0) {
     return <LoadingSpinner message="正在加载基金数据..." />;
@@ -114,40 +263,8 @@ export function FundList() {
         />
       )}
 
-      {/* 资产概览 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <DollarSign className="w-5 h-5" />
-            资产概览
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-muted rounded-lg">
-              <div className="text-sm text-muted-foreground">总成本</div>
-              <div className="text-xl font-bold">¥{assets.totalCost.toFixed(2)}</div>
-            </div>
-            <div className="text-center p-4 bg-muted rounded-lg">
-              <div className="text-sm text-muted-foreground">总市值</div>
-              <div className="text-xl font-bold">¥{assets.totalValue.toFixed(2)}</div>
-            </div>
-            <div className="text-center p-4 bg-muted rounded-lg">
-              <div className="text-sm text-muted-foreground">总收益</div>
-              <div className={`text-xl font-bold ${getProfitColor(assets.totalProfitRate)}`}>
-                {assets.totalProfit >= 0 ? '+' : ''}¥{assets.totalProfit.toFixed(2)}
-              </div>
-            </div>
-            <div className="text-center p-4 bg-muted rounded-lg">
-              <div className="text-sm text-muted-foreground">收益率</div>
-              <div className={`text-xl font-bold flex items-center justify-center gap-1 ${getProfitColor(assets.totalProfitRate)}`}>
-                {getProfitIcon(assets.totalProfitRate)}
-                {assets.totalProfitRate >= 0 ? '+' : ''}{assets.totalProfitRate.toFixed(2)}%
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* 资产概览 - 使用优化组件 */}
+      <AssetOverview assets={assets} />
 
       {/* 操作栏 */}
       <Card>
@@ -194,89 +311,16 @@ export function FundList() {
             </div>
           ) : (
             <div className="space-y-2">
-              {filteredFunds.map((fund) => {
-                const hasHoldings = fund.holdShares && fund.costPrice;
-                const holdShares = fund.holdShares || 0;
-                const costPrice = fund.costPrice || 0;
-                const currentValue = hasHoldings && fund.latestNav 
-                  ? holdShares * fund.latestNav.unitNav 
-                  : 0;
-                const costValue = hasHoldings ? holdShares * costPrice : 0;
-                const profit = currentValue - costValue;
-                const profitRate = costValue > 0 ? (profit / costValue) * 100 : 0;
-
-                return (
-                  <div 
-                    key={fund.code}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                    onClick={() => openFundDetail(fund)}
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{fund.name}</span>
-                        <Badge variant="secondary" className="text-xs">{fund.code}</Badge>
-                        <Badge variant="outline" className="text-xs">{fund.type}</Badge>
-                      </div>
-                      <div className="text-sm text-muted-foreground mt-1">
-                        {fund.latestNav ? (
-                          <span>净值: {fund.latestNav.unitNav.toFixed(4)} ({fund.latestNav.date})</span>
-                        ) : (
-                          <span>暂无净值数据</span>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="text-right mr-4">
-                      {hasHoldings ? (
-                        <>
-                          <div className="font-medium">{fund.holdShares} 份</div>
-                          <div className="text-sm text-muted-foreground">
-                            成本: ¥{fund.costPrice?.toFixed(4)}
-                          </div>
-                        </>
-                      ) : (
-                        <div className="text-sm text-muted-foreground">未持有</div>
-                      )}
-                    </div>
-
-                    {hasHoldings && (
-                      <div className={`text-right mr-4 ${getProfitColor(profitRate)}`}>
-                        <div className="font-medium flex items-center justify-end gap-1">
-                          {getProfitIcon(profitRate)}
-                          {profit >= 0 ? '+' : ''}¥{profit.toFixed(2)}
-                        </div>
-                        <div className="text-sm">
-                          {profitRate >= 0 ? '+' : ''}{profitRate.toFixed(2)}%
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRefreshNav(fund.code);
-                        }}
-                        disabled={loading}
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteFund(fund.code);
-                        }}
-                      >
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
+              {filteredFunds.map((fund) => (
+                <FundItem
+                  key={fund.code}
+                  fund={fund}
+                  onRefresh={handleRefreshNav}
+                  onDelete={handleDeleteFund}
+                  onDetail={openFundDetail}
+                  loading={loading}
+                />
+              ))}
             </div>
           )}
         </CardContent>

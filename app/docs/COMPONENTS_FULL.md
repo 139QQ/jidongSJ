@@ -1,6 +1,6 @@
 # 组件文档
 
-生成时间：2026-02-27 17:09:21
+生成时间：2026-02-27 20:06:23
 
 ---
 
@@ -9,6 +9,18 @@
 _我的基金列表组件，展示用户关注的基金_
 
 **文件**: `src/components/FundList.tsx`
+
+### Props
+
+```typescript
+interface FundItemProps {
+fund: UserFund;
+  onRefresh: (code: string) => void;
+  onDelete: (code: string) => void;
+  onDetail: (fund: UserFund) => void;
+  loading: boolean;
+}
+```
 
 ---
 
