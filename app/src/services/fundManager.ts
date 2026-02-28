@@ -9,23 +9,6 @@
  * 3. 增量更新代替全量重载
  * 4. 通过 fundService 获取数据（解耦 apiClient 直接依赖）
  * 5. 净值更新采用异步非阻塞模式
- * 
- * @example
- * ```typescript
- * const manager = new FundManager();
- * 
- * // 添加基金（即时响应，净值异步更新）
- * await manager.addFund('000001', '我的基金', 1000, 1.5);
- * 
- * // 获取所有基金
- * const funds = manager.getAllFunds();
- * 
- * // 更新基金
- * manager.updateFund('000001', { holdShares: 2000 });
- * 
- * // 删除基金
- * manager.deleteFund('000001');
- * ```
  */
 
 import type { UserFund, FundUpdateData, FundQueryOptions } from '@/types/fund';
@@ -54,49 +37,26 @@ export type NavUpdateCallback = (event: NavUpdateEvent) => void;
 
 /**
  * 基金管理类
- * @class FundManager
- * @description 管理用户关注的基金列表，提供完整的 CRUD 功能
- * 
- * 依赖关系：
- * - fundService: 获取基金基础数据
- * - navService: 获取基金净值数据（异步）
- * - storage: 持久化存储
- * - cache/persistentCache: 缓存管理
  */
 export class FundManager {
   private funds: Map<string, UserFund>;
   private navUpdateCallbacks: Set<NavUpdateCallback>;
 
-  /**
-   * 构造函数
-   */
   constructor() {
     this.funds = new Map();
     this.navUpdateCallbacks = new Set();
     this.loadFromStorage();
   }
 
-  /**
-   * 注册净值更新回调
-   * @param callback 回调函数
-   * @returns 取消订阅函数
-   */
   onNavUpdate(callback: NavUpdateCallback): () => void {
     this.navUpdateCallbacks.add(callback);
     return () => this.navUpdateCallbacks.delete(callback);
   }
 
-  /**
-   * 通知净值更新
-   * @param event 净值更新事件
-   */
   private notifyNavUpdate(event: NavUpdateEvent): void {
     this.navUpdateCallbacks.forEach(cb => cb(event));
   }
 
-  /**
-   * 从本地存储加载基金数据
-   */
   private loadFromStorage(): void {
     try {
       const savedFunds = storage.get<UserFund[]>(StorageKey.USER_FUNDS, []);
@@ -109,9 +69,6 @@ export class FundManager {
     }
   }
 
-  /**
-   * 保存基金数据到本地存储
-   */
   private saveToStorage(): void {
     try {
       const fundsArray = Array.from(this.funds.values());
@@ -121,36 +78,22 @@ export class FundManager {
     }
   }
 
-  /**
-   * 生成唯一ID
-   * @returns {string} 唯一ID
-   */
   private generateId(): string {
     return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  /**
-   * 添加基金到关注列表 - 优化版本
-   * @param {string} code - 基金代码
-   * @param {string} [remark] - 备注
-   * @param {number} [holdShares] - 持有份额
-   * @param {number} [costPrice] - 成本价
-   * @returns {Promise<UserFund | null>} 添加的基金或 null
-   */
   async addFund(
     code: string,
     remark?: string,
     holdShares?: number,
     costPrice?: number
   ): Promise<UserFund | null> {
-    // 检查是否已存在
     if (this.funds.has(code)) {
       console.warn(`[FundManager] 基金 ${code} 已存在`);
       return null;
     }
 
     try {
-      // 直接从 API 获取单只基金信息，避免加载全部数据
       const fundInfo = await this.getFundInfo(code);
 
       if (!fundInfo) {
@@ -158,7 +101,6 @@ export class FundManager {
         return null;
       }
 
-      // 创建用户基金对象（净值数据后续异步获取）
       const userFund: UserFund = {
         id: this.generateId(),
         code: fundInfo.code,
@@ -177,8 +119,6 @@ export class FundManager {
       this.saveToStorage();
 
       console.log(`[FundManager] 成功添加基金 ${code}`);
-      
-      // 异步获取最新净值（不阻塞添加操作）
       this.fetchLatestNav(code).catch(console.error);
       
       return userFund;
@@ -188,11 +128,6 @@ export class FundManager {
     }
   }
 
-  /**
-   * 获取单只基金信息 - 优化版本（通过 fundService 获取）
-   * @param {string} code - 基金代码
-   * @returns {Promise<{code: string; name: string; latestNav?: any} | null>}
-   */
   private async getFundInfo(code: string): Promise<{
     code: string;
     name: string;
@@ -203,7 +138,6 @@ export class FundManager {
       dailyGrowthRate: number;
     };
   } | null> {
-    // 1. 先从单只基金缓存获取
     const singleCached = persistentCache.get<{
       code: string;
       name: string;
@@ -214,7 +148,6 @@ export class FundManager {
       return singleCached;
     }
     
-    // 2. 从内存缓存获取
     const memCached = cache.get<{
       code: string;
       name: string;
@@ -225,7 +158,6 @@ export class FundManager {
       return memCached;
     }
     
-    // 3. 通过 fundService 获取（解耦 apiClient 直接依赖）
     try {
       console.log(`[FundManager] 通过 fundService 获取基金${code}信息`);
       const allFunds = await fundService.getOpenFundList();
@@ -247,7 +179,6 @@ export class FundManager {
         }
       };
       
-      // 缓存结果
       cache.set(`fund_${code}`, result, 30 * 60 * 1000);
       persistentCache.set(`fund_${code}`, result);
       
@@ -258,13 +189,8 @@ export class FundManager {
     }
   }
 
-  /**
-   * 异步获取最新净值（不阻塞添加操作）
-   * @param {string} code - 基金代码
-   */
   private async fetchLatestNav(code: string): Promise<void> {
     try {
-      // 先检查缓存，避免重复请求
       const cachedNav = cache.get<any>(`nav_${code}`);
       if (cachedNav) {
         console.log(`[FundManager] 从缓存获取基金${code}净值`);
@@ -274,7 +200,6 @@ export class FundManager {
 
       const latestNav = await navService.getLatestNav(code);
       if (latestNav) {
-        // 缓存净值数据（1 小时）
         cache.set(`nav_${code}`, latestNav, 60 * 60 * 1000);
         this.updateFundNav(code, latestNav);
       }
@@ -283,11 +208,6 @@ export class FundManager {
     }
   }
 
-  /**
-   * 更新基金净值并通知回调
-   * @param code 基金代码
-   * @param nav 净值数据
-   */
   private updateFundNav(code: string, nav: any): void {
     const fund = this.funds.get(code);
     if (fund) {
@@ -296,7 +216,6 @@ export class FundManager {
       this.funds.set(code, fund);
       this.saveToStorage();
       
-      // 通知回调
       this.notifyNavUpdate({
         code,
         nav,
@@ -307,11 +226,6 @@ export class FundManager {
     }
   }
 
-  /**
-   * 批量添加基金
-   * @param {Array<{code: string; remark?: string; holdShares?: number; costPrice?: number}>} items - 基金数组
-   * @returns {Promise<UserFund[]>} 成功添加的基金数组
-   */
   async batchAddFunds(
     items: Array<{ code: string; remark?: string; holdShares?: number; costPrice?: number }>
   ): Promise<UserFund[]> {
@@ -332,11 +246,6 @@ export class FundManager {
     return results;
   }
 
-  /**
-   * 根据基金名称推断基金类型
-   * @param {string} name - 基金名称
-   * @returns {FundType} 基金类型
-   */
   private inferFundType(name: string): FundType {
     const lowerName = name.toLowerCase();
     
@@ -353,37 +262,18 @@ export class FundManager {
     return FundType.UNKNOWN;
   }
 
-  /**
-   * 获取所有基金
-   * @returns {UserFund[]} 基金数组
-   */
   getAllFunds(): UserFund[] {
     return Array.from(this.funds.values());
   }
 
-  /**
-   * 根据代码获取基金
-   * @param {string} code - 基金代码
-   * @returns {UserFund | undefined} 基金对象
-   */
   getFundByCode(code: string): UserFund | undefined {
     return this.funds.get(code);
   }
 
-  /**
-   * 根据ID获取基金
-   * @param {string} id - 基金ID
-   * @returns {UserFund | undefined} 基金对象
-   */
   getFundById(id: string): UserFund | undefined {
     return Array.from(this.funds.values()).find(f => f.id === id);
   }
 
-  /**
-   * 查询基金
-   * @param {FundQueryOptions} options - 查询选项
-   * @returns {UserFund[]} 符合条件的基金数组
-   */
   queryFunds(options: FundQueryOptions = {}): UserFund[] {
     let result = this.getAllFunds();
 
@@ -407,12 +297,6 @@ export class FundManager {
     return result;
   }
 
-  /**
-   * 更新基金信息
-   * @param {string} code - 基金代码
-   * @param {FundUpdateData} data - 更新数据
-   * @returns {UserFund | null} 更新后的基金或null
-   */
   updateFund(code: string, data: FundUpdateData): UserFund | null {
     const fund = this.funds.get(code);
     if (!fund) {
@@ -433,11 +317,6 @@ export class FundManager {
     return updatedFund;
   }
 
-  /**
-   * 批量更新基金
-   * @param {Record<string, FundUpdateData>} updates - 更新数据映射
-   * @returns {UserFund[]} 更新成功的基金数组
-   */
   batchUpdateFunds(updates: Record<string, FundUpdateData>): UserFund[] {
     const results: UserFund[] = [];
     
@@ -451,11 +330,6 @@ export class FundManager {
     return results;
   }
 
-  /**
-   * 删除基金
-   * @param {string} code - 基金代码
-   * @returns {boolean} 是否删除成功
-   */
   deleteFund(code: string): boolean {
     if (!this.funds.has(code)) {
       console.warn(`[FundManager] 基金 ${code} 不存在`);
@@ -469,11 +343,6 @@ export class FundManager {
     return true;
   }
 
-  /**
-   * 刷新基金净值 - 优化版本（使用缓存）
-   * @param {string} code - 基金代码
-   * @returns {Promise<UserFund | null>} 更新后的基金或 null
-   */
   async refreshFundNav(code: string): Promise<UserFund | null> {
     const fund = this.funds.get(code);
     if (!fund) {
@@ -482,7 +351,6 @@ export class FundManager {
     }
 
     try {
-      // 先检查缓存
       const cachedNav = cache.get<any>(`nav_${code}`);
       if (cachedNav) {
         console.log(`[FundManager] 从缓存获取基金${code}净值`);
@@ -494,8 +362,7 @@ export class FundManager {
       
       const latestNav = await navService.getLatestNav(code);
       if (latestNav) {
-        // 缓存净值数据
-        cache.set(`nav_${code}`, latestNav, 60 * 60 * 1000); // 1 小时缓存
+        cache.set(`nav_${code}`, latestNav, 60 * 60 * 1000);
         fund.latestNav = latestNav;
         fund.lastUpdated = new Date().toISOString();
         this.funds.set(code, fund);
@@ -509,10 +376,6 @@ export class FundManager {
     }
   }
 
-  /**
-   * 刷新所有基金净值
-   * @returns {Promise<number>} 刷新成功的数量
-   */
   async refreshAllNavs(): Promise<number> {
     let count = 0;
     const funds = this.getAllFunds();
@@ -528,11 +391,6 @@ export class FundManager {
     return count;
   }
 
-  /**
-   * 计算基金收益
-   * @param {string} code - 基金代码
-   * @returns {Object | null} 收益数据
-   */
   calculateProfit(code: string): {
     totalProfit: number;
     profitRate: number;
@@ -557,10 +415,6 @@ export class FundManager {
     };
   }
 
-  /**
-   * 计算总资产
-   * @returns {Object} 资产数据
-   */
   calculateTotalAssets(): {
     totalCost: number;
     totalValue: number;
@@ -589,27 +443,14 @@ export class FundManager {
     };
   }
 
-  /**
-   * 获取基金数量
-   * @returns {number} 基金数量
-   */
   getFundCount(): number {
     return this.funds.size;
   }
 
-  /**
-   * 检查基金是否存在
-   * @param {string} code - 基金代码
-   * @returns {boolean} 是否存在
-   */
   hasFund(code: string): boolean {
     return this.funds.has(code);
   }
 
-  /**
-   * 导出基金数据
-   * @returns {string} JSON字符串
-   */
   exportData(): string {
     const data = {
       funds: this.getAllFunds(),
@@ -619,11 +460,6 @@ export class FundManager {
     return JSON.stringify(data, null, 2);
   }
 
-  /**
-   * 导入基金数据
-   * @param {string} jsonData - JSON字符串
-   * @returns {boolean} 是否导入成功
-   */
   importData(jsonData: string): boolean {
     try {
       const data = JSON.parse(jsonData);
@@ -644,6 +480,18 @@ export class FundManager {
       return false;
     } catch (error) {
       console.error('[FundManager] 导入数据失败:', error);
+      return false;
+    }
+  }
+
+  clearAllFunds(): boolean {
+    try {
+      this.funds.clear();
+      this.saveToStorage();
+      console.log('[FundManager] 已清空所有基金数据');
+      return true;
+    } catch (error) {
+      console.error('[FundManager] 清空基金数据失败:', error);
       return false;
     }
   }

@@ -12,7 +12,7 @@
  * 6. 单只基金详情独立缓存
  */
 
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { FundRealtime } from '@/types/fund';
 import { fundService } from '@/services/fundService';
 import { apiClient } from '@/services/apiClient';
@@ -24,7 +24,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Search, Plus, Loader2, AlertCircle, Database, RefreshCw, Zap } from 'lucide-react';
+import { Search, Plus, Loader2, AlertCircle, RefreshCw, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 
 /** 轻量级基金索引项 */
@@ -72,6 +72,8 @@ export function FundSearchDialog({ open, onOpenChange, onSelect }: FundSearchDia
     if (indexLoaded || loadingRef.current) return;
     
     loadingRef.current = true;
+    setProgressMessage('正在加载基金索引...');
+    setProgress(10);
     
     // 先检查持久化缓存
     const cachedIndex = persistentCache.get<FundIndexItem[]>('fund_index');
@@ -80,6 +82,11 @@ export function FundSearchDialog({ open, onOpenChange, onSelect }: FundSearchDia
       setFundIndex(cachedIndex);
       cache.set('fund_index', cachedIndex, 24 * 60 * 60 * 1000); // 同步到内存缓存
       setIndexLoaded(true);
+      setProgress(100);
+      setTimeout(() => {
+        setProgress(0);
+        setProgressMessage('');
+      }, 500);
       loadingRef.current = false;
       return;
     }
@@ -90,22 +97,35 @@ export function FundSearchDialog({ open, onOpenChange, onSelect }: FundSearchDia
       console.log('[FundSearchDialog] 从内存缓存加载基金索引');
       setFundIndex(memCachedIndex);
       setIndexLoaded(true);
+      setProgress(100);
+      setTimeout(() => {
+        setProgress(0);
+        setProgressMessage('');
+      }, 500);
       loadingRef.current = false;
       return;
     }
     
-    // 从完整数据提取索引
+    // 使用新的 getFundIndex 方法
     try {
-      const funds = await fundService.getOpenFundList();
-      const index = funds.map(f => ({ code: f.code, name: f.name }));
+      setProgressMessage('正在从服务器获取基金索引...');
+      const index = await fundService.getFundIndex();
       setFundIndex(index);
       cache.set('fund_index', index, 24 * 60 * 60 * 1000);
       persistentCache.set('fund_index', index); // 持久化缓存
       setIndexLoaded(true);
+      setProgress(100);
       console.log(`[FundSearchDialog] 索引加载完成：${index.length}项`);
+      
+      setTimeout(() => {
+        setProgress(0);
+        setProgressMessage('');
+      }, 500);
     } catch (err) {
       console.error('[FundSearchDialog] 索引加载失败:', err);
       setError('索引加载失败，请刷新页面重试');
+      setProgress(0);
+      setProgressMessage('');
     } finally {
       loadingRef.current = false;
     }

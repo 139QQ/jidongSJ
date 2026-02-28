@@ -76,9 +76,10 @@ export class FundService {
    * - 支持强制刷新
    * 
    * @param forceRefresh 是否强制刷新缓存
+   * @param onProgress 进度回调函数 (当前数量，总数量)
    * @returns 基金列表
    */
-  async getOpenFundList(forceRefresh = false): Promise<FundRealtime[]> {
+  async getOpenFundList(forceRefresh = false, onProgress?: (current: number, total: number) => void): Promise<FundRealtime[]> {
     const cacheKey = 'fund_open_fund_daily_em';
     const isTrading = this.isTradingTime();
     
@@ -90,6 +91,7 @@ export class FundService {
       const cached = serviceCache.get<FundRealtime[]>(cacheKey);
       if (cached) {
         console.log(`[FundService] 从缓存获取基金列表（${isTrading ? '交易时间' : '非交易时间'}）`);
+        onProgress?.(cached.length, cached.length);
         return cached;
       }
     }
@@ -101,29 +103,47 @@ export class FundService {
       
       if (!Array.isArray(data)) {
         console.warn('获取开放式基金列表返回格式异常');
+        onProgress?.(0, 0);
         return [];
       }
 
-      const funds = data.map((item) => {
-        const getField = (suffix: string): string => {
-          const key = Object.keys(item).find(k => k.includes(suffix));
-          return key ? String(item[key] ?? '') : '';
-        };
+      const total = data.length;
+      const funds: FundRealtime[] = [];
+      
+      // 分批处理数据，每批 1000 条
+      const batchSize = 1000;
+      for (let i = 0; i < total; i += batchSize) {
+        const batch = data.slice(i, i + batchSize);
+        const processed = batch.map((item) => {
+          const getField = (suffix: string): string => {
+            const key = Object.keys(item).find(k => k.includes(suffix));
+            return key ? String(item[key] ?? '') : '';
+          };
+          
+          return {
+            code: item['基金代码'] || '',
+            name: item['基金简称'] || '',
+            unitNav: parseFloat(getField('-单位净值')) || 0,
+            cumulativeNav: parseFloat(getField('-累计净值')) || 0,
+            prevUnitNav: 0,
+            prevCumulativeNav: 0,
+            dailyGrowthValue: parseFloat(item['日增长值'] ?? '0') || 0,
+            dailyGrowthRate: parseFloat(item['日增长率'] ?? '0') || 0,
+            purchaseStatus: item['申购状态'] || '',
+            redeemStatus: item['赎回状态'] || '',
+            fee: item['手续费'] || ''
+          };
+        });
+        funds.push(...processed);
         
-        return {
-          code: item['基金代码'] || '',
-          name: item['基金简称'] || '',
-          unitNav: parseFloat(getField('-单位净值')) || 0,
-          cumulativeNav: parseFloat(getField('-累计净值')) || 0,
-          prevUnitNav: 0,
-          prevCumulativeNav: 0,
-          dailyGrowthValue: parseFloat(item['日增长值'] ?? '0') || 0,
-          dailyGrowthRate: parseFloat(item['日增长率'] ?? '0') || 0,
-          purchaseStatus: item['申购状态'] || '',
-          redeemStatus: item['赎回状态'] || '',
-          fee: item['手续费'] || ''
-        };
-      });
+        // 报告进度
+        onProgress?.(funds.length, total);
+        
+        // 给 UI 渲染时间，避免阻塞
+        if (i + batchSize < total) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+      }
       
       // 动态缓存时间
       serviceCache.set(cacheKey, funds, cacheTTL);
@@ -136,8 +156,39 @@ export class FundService {
       const staleCache = serviceCache.get<FundRealtime[]>(cacheKey);
       if (staleCache) {
         console.log('[FundService] 返回过期缓存数据');
+        onProgress?.(staleCache.length, staleCache.length);
         return staleCache;
       }
+      throw error;
+    }
+  }
+
+  /**
+   * 获取基金索引（轻量级，仅代码和名称）
+   * 用于快速搜索，无需等待完整数据加载
+   * 
+   * @param forceRefresh 是否强制刷新
+   * @returns 基金索引列表
+   */
+  async getFundIndex(forceRefresh = false): Promise<{ code: string; name: string }[]> {
+    const cacheKey = 'fund_index_em';
+    const cacheTTL = 24 * 60 * 60 * 1000; // 24 小时
+    
+    if (!forceRefresh) {
+      const cached = serviceCache.get<{ code: string; name: string }[]>(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    }
+    
+    try {
+      // 从完整列表提取索引
+      const funds = await this.getOpenFundList(forceRefresh);
+      const index = funds.map(f => ({ code: f.code, name: f.name }));
+      serviceCache.set(cacheKey, index, cacheTTL);
+      return index;
+    } catch (error) {
+      console.error('获取基金索引失败:', error);
       throw error;
     }
   }

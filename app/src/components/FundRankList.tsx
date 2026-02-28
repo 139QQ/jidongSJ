@@ -43,12 +43,11 @@ export function FundRankList() {
   const [progress, setProgress] = useState(0);
   const [isPreloaded, setIsPreloaded] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
   
-  // 使用ref跟踪已加载的类型
+  // 使用 ref 跟踪已加载的类型
   const loadedTypes = useRef<Set<string>>(new Set());
 
-  // 获取缓存key - 与fundService保持一致 (fund_open_fund_rank_em)
+  // 获取缓存 key - 与 fundService 保持一致 (fund_open_fund_rank_em)
   const getCacheKey = useCallback((type: string) => {
     return generateCacheKey('fund_open_fund_rank_em', { symbol: type });
   }, []);
@@ -60,14 +59,14 @@ export function FundRankList() {
     // 先检查内存缓存
     const memoryCached = cache.get<FundRank[]>(cacheKey);
     if (memoryCached) {
-      console.log(`[FundRankList] 从内存缓存加载: ${type}`);
+      console.log(`[FundRankList] 从内存缓存加载：${type}`);
       return memoryCached;
     }
     
     // 再检查持久化缓存
     const persistentCached = persistentCache.get<FundRank[]>(cacheKey);
     if (persistentCached) {
-      console.log(`[FundRankList] 从持久化缓存加载: ${type}`);
+      console.log(`[FundRankList] 从持久化缓存加载：${type}`);
       // 同步到内存缓存
       cache.set(cacheKey, persistentCached, 30 * 60 * 1000);
       return persistentCached;
@@ -85,7 +84,7 @@ export function FundRankList() {
 
   // 加载指定类型的排行数据
   const loadRankData = useCallback(async (type: RankType, forceRefresh: boolean = false) => {
-    console.log(`[FundRankList] 开始加载排行数据: ${type}, forceRefresh=${forceRefresh}`);
+    console.log(`[FundRankList] 开始加载排行数据：${type}, forceRefresh=${forceRefresh}`);
     
     // 检查是否已加载过（且不是强制刷新）
     if (!forceRefresh && loadedTypes.current.has(type)) {
@@ -110,11 +109,11 @@ export function FundRankList() {
       // 先尝试从缓存加载
       if (!forceRefresh) {
         const cacheKey = getCacheKey(type);
-        console.log(`[FundRankList] 检查缓存: ${cacheKey}`);
+        console.log(`[FundRankList] 检查缓存：${cacheKey}`);
         
         const cached = loadFromCache(type);
         if (cached && cached.length > 0) {
-          console.log(`[FundRankList] 从缓存加载成功: ${cached.length} 条`);
+          console.log(`[FundRankList] 从缓存加载成功：${cached.length} 条`);
           setAllRanks(cached);
           setDisplayRanks(cached.slice(0, INITIAL_SIZE));
           setHasMore(cached.length > INITIAL_SIZE);
@@ -129,19 +128,19 @@ export function FundRankList() {
             .catch(() => {});
           return;
         }
-        console.log('[FundRankList] 缓存未命中，从API加载');
+        console.log('[FundRankList] 缓存未命中，从 API 加载');
       }
 
       setProgress(50);
       toast.info(`正在加载${type}排行数据...`, { duration: 5000 });
 
-      // 从API加载
-      console.log(`[FundRankList] 调用API: fundService.getFundRank('${type}')`);
+      // 从 API 加载
+      console.log(`[FundRankList] 调用 API: fundService.getFundRank('${type}')`);
       const data = await fundService.getFundRank(type);
-      console.log(`[FundRankList] API返回数据: ${data?.length || 0} 条`);
+      console.log(`[FundRankList] API 返回数据：${data?.length || 0} 条`);
       
       if (!data || data.length === 0) {
-        console.warn('[FundRankList] API返回空数据');
+        console.warn('[FundRankList] API 返回空数据');
         setError('暂无数据');
         setLoading(false);
         return;
@@ -155,7 +154,6 @@ export function FundRankList() {
       setDisplayRanks(data.slice(0, INITIAL_SIZE));
       setHasMore(data.length > INITIAL_SIZE);
       setIsPreloaded(true);
-      setCurrentPage(1);
       loadedTypes.current.add(type);
       
       setProgress(100);
@@ -167,15 +165,15 @@ export function FundRankList() {
       let errorMsg = '加载失败';
       const errorObj = err as { code?: string; message?: string; response?: { status?: number } };
       if (errorObj.code === 'ECONNABORTED' || errorObj.message?.includes('timeout')) {
-        errorMsg = '请求超时，AKTools服务器响应较慢，请稍后重试';
+        errorMsg = '请求超时，AKTools 服务器响应较慢，请稍后重试';
       } else if (errorObj.message?.includes('Network Error')) {
-        errorMsg = '网络错误，请检查网络连接或AKTools服务器状态';
+        errorMsg = '网络错误，请检查网络连接或 AKTools 服务器状态';
       } else if (errorObj.response?.status === 404) {
-        errorMsg = 'API接口不存在，请检查AKTools服务';
+        errorMsg = 'API 接口不存在，请检查 AKTools 服务';
       } else if (errorObj.response?.status && errorObj.response.status >= 500) {
         errorMsg = '服务器错误，请稍后重试';
       } else if (errorObj.message) {
-        errorMsg = `加载失败: ${errorObj.message}`;
+        errorMsg = `加载失败：${errorObj.message}`;
       }
       
       setError(errorMsg);
@@ -212,7 +210,6 @@ export function FundRankList() {
       // 直接截取数据
       const newData = allRanks.slice(0, newLength);
       setDisplayRanks(newData);
-      setCurrentPage(prev => prev + 1);
       setHasMore(newLength < allRanks.length);
     } catch (error) {
       console.error('[FundRankList] 加载更多失败:', error);
@@ -236,7 +233,6 @@ export function FundRankList() {
     
     console.log(`[FundRankList] 切换到 ${type}`);
     setRankType(type);
-    setCurrentPage(1);
     setError(null);
     
     // 检查是否已加载过 - 直接从内存缓存恢复，不再调用 API

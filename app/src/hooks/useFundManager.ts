@@ -61,6 +61,8 @@ interface UseFundManagerReturn {
     totalProfit: number;
     totalProfitRate: number;
   };
+  /** 加载进度 */
+  loadingProgress?: { current: number; total: number } | null;
 }
 
 /**
@@ -71,6 +73,7 @@ export function useFundManager(): UseFundManagerReturn {
   const [funds, setFunds] = useState<UserFund[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // loadingProgress 用于显示加载进度（暂未使用）
   const managerRef = useRef<FundManager>(fundManager);
 
   // 加载基金列表 - 优化版本（使用函数式更新）

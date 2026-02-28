@@ -2,10 +2,16 @@
  * 基金对比组件
  * @module components/FundCompare
  * @description 支持多只基金收益率对比
+ * 
+ * 优化说明：
+ * 1. 使用项目统一的 API 客户端获取数据
+ * 2. 添加完整的收益率数据展示
+ * 3. 改进图表展示效果
  */
 
 import { useState, useCallback, useMemo } from 'react';
 import type { FundRank } from '@/types/fund';
+import { getFundRank } from '@/services/fundService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,52 +50,23 @@ export function FundCompare() {
     try {
       setLoading(true);
       setError(null);
+      
+      const data = await getFundRank(code);
+      
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        throw new Error('未找到该基金');
+      }
 
-      // 使用 AKShare API 获取基金数据
-      const response = await fetch(`https://fundgz.1234567.com.cn/js/${code}.js`, {
-        headers: {
-          'Referer': 'https://fund.eastmoney.com/'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error('获取基金数据失败');
-      }
-      
-      const text = await response.text();
-      // 解析 jsonp 响应
-      const match = text.match(/jsonpgz\((.+)\)/);
-      if (!match) {
-        throw new Error('解析基金数据失败');
-      }
-      
-      const data = JSON.parse(match[1]);
-      
+      // getFundRank 返回的是数组，取第一个匹配结果
+      const fundData = data[0];
+
       setCompareFunds(prev => [...prev, {
         code,
-        name: data.name || `基金${code}`,
-        rankData: {
-          rank: 0,
-          code: data.code,
-          name: data.name,
-          unitNav: parseFloat(data.dwjz) || 0,
-          cumulativeNav: parseFloat(data.ljjz) || 0,
-          date: data.gztime,
-          dailyGrowthRate: parseFloat(data.jzzzl) || 0,
-          week1: 0,
-          month1: 0,
-          month3: 0,
-          month6: 0,
-          year1: 0,
-          year2: 0,
-          year3: 0,
-          thisYear: 0,
-          sinceEstablish: 0,
-          fee: ''
-        }
+        name: fundData.name || `基金${code}`,
+        rankData: fundData
       }]);
 
-      toast.success(`已添加 ${data.name} 到对比`);
+      toast.success(`已添加 ${fundData.name} 到对比`);
       setSearchCode('');
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : '添加失败';

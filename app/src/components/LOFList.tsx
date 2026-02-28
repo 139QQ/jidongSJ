@@ -27,7 +27,6 @@ interface LOFRowProps {
 const LOFRow = memo<LOFRowProps>(({ fund, loading, onRefresh }) => {
   const isUp = fund.changeRate >= 0;
   const ProfitIcon = isUp ? TrendingUp : TrendingDown;
-  const profitColor = isUp ? 'text-red-500' : 'text-green-500';
 
   return (
     <TableRow className="hover:bg-muted/50">
@@ -40,13 +39,13 @@ const LOFRow = memo<LOFRowProps>(({ fund, loading, onRefresh }) => {
       <TableCell className="text-right font-medium">
         {fund.latestPrice.toFixed(3)}
       </TableCell>
-      <TableCell className={\	ext-right font-medium \\}>
+      <TableCell className="text-right font-medium">
         <div className="flex items-center justify-end gap-1">
           <ProfitIcon className="w-3 h-3" />
           {isUp ? '+' : ''}{fund.changeRate.toFixed(2)}%
         </div>
       </TableCell>
-      <TableCell className={\	ext-right \\}>
+      <TableCell className="text-right">
         {isUp ? '+' : ''}{fund.changeValue.toFixed(3)}
       </TableCell>
       <TableCell className="text-right">{fund.volume.toLocaleString()}</TableCell>
@@ -62,12 +61,12 @@ const LOFRow = memo<LOFRowProps>(({ fund, loading, onRefresh }) => {
             disabled={loading}
             className="w-8 h-8"
           >
-            <RefreshCw className={\w-4 h-4 \\} />
+            <RefreshCw className="w-4 h-4" />
           </Button>
           <Button 
             variant="ghost" 
             size="icon"
-            onClick={() => window.open(\https://fund.eastmoney.com/\.html\, '_blank')}
+            onClick={() => window.open(`https://fund.eastmoney.com/${fund.code}.html`, '_blank')}
             className="w-8 h-8"
           >
             <ExternalLink className="w-4 h-4" />
@@ -107,8 +106,8 @@ export function LOFList() {
     try {
       setRefreshingCode(code);
       const data = await getLOFRealtime(code);
-      setLofFunds(prev => prev.map(f => f.code === code ? data : f));
-      toast.success(\已刷新：\\);
+      setLofFunds(prev => prev.map(f => f.code === code ? data : f).filter(Boolean) as LOFRealtime[]);
+      toast.success(`已刷新：${data?.name || code}`);
     } catch (err) {
       toast.error('刷新失败：' + (err instanceof Error ? err.message : '未知错误'));
     } finally {
@@ -170,7 +169,7 @@ export function LOFList() {
               onClick={() => handleRefresh()}
               disabled={loading}
             >
-              <RefreshCw className={\w-4 h-4 mr-2 \\} />
+              <RefreshCw className="w-4 h-4 mr-2" />
               刷新全部
             </Button>
           </div>

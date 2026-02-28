@@ -199,6 +199,7 @@ export function FundList() {
   const [selectedFund, setSelectedFund] = useState<UserFund | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  // loadingProgress 用于显示加载进度（暂未使用）
 
   // 使用 useMemo 缓存过滤结果
   const filteredFunds = useMemo(() => {
@@ -249,8 +250,17 @@ export function FundList() {
     setIsDetailOpen(true);
   }, []);
 
-  if (loading && funds.length === 0) {
-    return <LoadingSpinner message="正在加载基金数据..." />;
+  // 显示加载进度
+  const showLoading = loading && funds.length === 0;
+  
+  if (showLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-col items-center justify-center py-12">
+          <LoadingSpinner message="正在加载基金数据..." />
+        </div>
+      </div>
+    );
   }
 
   return (

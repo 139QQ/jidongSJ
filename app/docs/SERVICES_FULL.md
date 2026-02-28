@@ -1,6 +1,6 @@
 # 服务模块文档
 
-生成时间：2026-02-27 20:06:23
+生成时间：2026-02-28 17:17:23
 
 ---
 
@@ -40,7 +40,8 @@ export async function getFundReports
 export async function getFundPersonnelAnnouncements
 export async function getFundRating
 export async function getFundManagers
-export const fundInfoService
+export async function getLOFRealtime
+export async function getAllLOFRealtime
 ```
 
 ---
