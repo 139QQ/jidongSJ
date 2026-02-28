@@ -461,3 +461,139 @@ export interface FundManagerInfo {
   /** 现任基金最佳回报 (%) */
   bestReturn: number;
 }
+
+// ==================== LOF 基金相关类型 ====================
+
+/** LOF 基金实时行情接口 */
+export interface LOFRealtime {
+  /** 基金代码 */
+  code: string;
+  /** 基金名称 */
+  name: string;
+  /** 最新价 */
+  latestPrice: number;
+  /** 涨跌幅 */
+  changeRate: number;
+  /** 涨跌额 */
+  changeValue: number;
+  /** 成交量 (手) */
+  volume: number;
+  /** 成交额 (元) */
+  amount: number;
+  /** 开盘价 */
+  openPrice: number;
+  /** 最高价 */
+  highPrice: number;
+  /** 最低价 */
+  lowPrice: number;
+  /** 昨收价 */
+  prevClose: number;
+  /** 买价 */
+  bidPrice: number;
+  /** 卖价 */
+  askPrice: number;
+  /** 买量 */
+  bidVolume: number;
+  /** 卖量 */
+  askVolume: number;
+  /** 换手率 */
+  turnoverRate: number;
+  /** 溢价率 */
+  premiumRate: number;
+  /** 单位净值 */
+  unitNav: number;
+  /** 累计净值 */
+  cumulativeNav: number;
+  /** 净值日期 */
+  navDate: string;
+}
+
+// ==================== ETF 基金相关类型 ====================
+
+/** ETF 基金实时行情接口 */
+export interface ETFRealtime {
+  /** 基金代码 */
+  code: string;
+  /** 基金名称 */
+  name: string;
+  /** 最新价 */
+  latestPrice: number;
+  /** 涨跌幅 */
+  changeRate: number;
+  /** 涨跌额 */
+  changeValue: number;
+  /** 成交量 (手) */
+  volume: number;
+  /** 成交额 (元) */
+  amount: number;
+  /** 开盘价 */
+  openPrice: number;
+  /** 最高价 */
+  highPrice: number;
+  /** 最低价 */
+  lowPrice: number;
+  /** 昨收价 */
+  prevClose: number;
+  /** 买价 */
+  bidPrice: number;
+  /** 卖价 */
+  askPrice: number;
+  /** 买量 */
+  bidVolume: number;
+  /** 卖量 */
+  askVolume: number;
+  /** 换手率 */
+  turnoverRate: number;
+  /** 溢价率 */
+  premiumRate: number;
+  /** 单位净值 */
+  unitNav: number;
+  /** 累计净值 */
+  cumulativeNav: number;
+  /** 净值日期 */
+  navDate: string;
+  /** 总市值 */
+  totalMarketValue: number;
+  /** 流通市值 */
+  circulatingMarketValue: number;
+}
+
+// ==================== 基金分红送配相关类型 ====================
+
+/** 基金分红信息接口 */
+export interface FundDividend {
+  /** 基金代码 */
+  fundCode: string;
+  /** 基金名称 */
+  fundName: string;
+  /** 权益登记日 */
+  recordDate: string;
+  /** 除息交易/拆分日 */
+  exDividendDate: string;
+  /** 分红发放日 */
+  dividendPayDate: string;
+  /** 分红 (元/份) */
+  dividendPerShare: number;
+  /** 分红总额 (万元) */
+  totalDividend: number;
+  /** 分红类型 */
+  dividendType: string;
+}
+
+/** 基金拆分信息接口 */
+export interface FundSplit {
+  /** 基金代码 */
+  fundCode: string;
+  /** 基金名称 */
+  fundName: string;
+  /** 拆分公告日 */
+  announcementDate: string;
+  /** 拆分日 */
+  splitDate: string;
+  /** 拆分比例 */
+  splitRatio: number;
+  /** 拆分前净值 */
+  preSplitNav: number;
+  /** 拆分后净值 */
+  postSplitNav: number;
+}

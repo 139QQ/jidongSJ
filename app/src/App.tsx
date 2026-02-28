@@ -14,6 +14,10 @@ import { FundList } from '@/components/FundList';
 import { FundRankList } from '@/components/FundRankList';
 import { SettingsPanel } from '@/components/SettingsPanel';
 import { NavChart } from '@/components/NavChart';
+import { LOFList } from '@/components/LOFList';
+import { ETFList } from '@/components/ETFList';
+import { DividendList } from '@/components/DividendList';
+import { FundCompare } from '@/components/FundCompare';
 import { useFundManager } from '@/hooks/useFundManager';
 import { useNavHistory } from '@/hooks/useNavHistory';
 import { ErrorAlert } from '@/components/ErrorAlert';
@@ -27,7 +31,10 @@ import {
   RefreshCw,
   TrendingDown,
   DollarSign,
-  BarChart3
+  BarChart3,
+  PieChart,
+  FileText,
+  Gift
 } from 'lucide-react';
 import './App.css';
 
@@ -258,7 +265,7 @@ function App() {
       {/* 主内容 */}
       <main className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-[400px]">
+          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 gap-2 lg:w-auto">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <LayoutDashboard className="w-4 h-4" />
               <span className="hidden sm:inline">仪表盘</span>
@@ -274,6 +281,30 @@ function App() {
             <TabsTrigger value="settings" className="flex items-center gap-2">
               <Settings className="w-4 h-4" />
               <span className="hidden sm:inline">设置</span>
+            </TabsTrigger>
+          </TabsList>
+          
+          {/* 第二行 Tabs - 新增功能 */}
+          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 gap-2 lg:w-auto">
+            <TabsTrigger value="lof" className="flex items-center gap-2">
+              <PieChart className="w-4 h-4" />
+              <span>LOF 基金</span>
+            </TabsTrigger>
+            <TabsTrigger value="etf" className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4" />
+              <span>ETF 基金</span>
+            </TabsTrigger>
+            <TabsTrigger value="dividend" className="flex items-center gap-2">
+              <Gift className="w-4 h-4" />
+              <span>分红送配</span>
+            </TabsTrigger>
+            <TabsTrigger value="compare" className="flex items-center gap-2">
+              <PieChart className="w-4 h-4" />
+              <span>基金对比</span>
+            </TabsTrigger>
+            <TabsTrigger value="documents" className="flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              <span>文档</span>
             </TabsTrigger>
           </TabsList>
 
@@ -295,6 +326,55 @@ function App() {
 
           <TabsContent value="settings" className="mt-6">
             <SettingsPanel />
+          </TabsContent>
+          
+          <TabsContent value="lof" className="mt-6">
+            <LOFList />
+          </TabsContent>
+          
+          <TabsContent value="etf" className="mt-6">
+            <ETFList />
+          </TabsContent>
+          
+          <TabsContent value="dividend" className="mt-6">
+            <DividendList />
+          </TabsContent>
+          
+          <TabsContent value="compare" className="mt-6">
+            <FundCompare />
+          </TabsContent>
+          
+          <TabsContent value="documents" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>文档中心</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <Card>
+                    <CardContent className="pt-6">
+                      <h3 className="font-medium mb-2">API 文档</h3>
+                      <p className="text-sm text-muted-foreground mb-4">查看完整的 API 接口说明</p>
+                      <a href="/docs/API_REFERENCE.md" className="text-primary hover:underline">查看 API 参考</a>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6">
+                      <h3 className="font-medium mb-2">架构文档</h3>
+                      <p className="text-sm text-muted-foreground mb-4">了解系统架构和设计</p>
+                      <a href="/docs/ARCHITECTURE.md" className="text-primary hover:underline">查看架构说明</a>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6">
+                      <h3 className="font-medium mb-2">开发计划</h3>
+                      <p className="text-sm text-muted-foreground mb-4">查看项目开发计划和进度</p>
+                      <a href="/docs/DEVELOPMENT_PLAN.md" className="text-primary hover:underline">查看开发计划</a>
+                    </CardContent>
+                  </Card>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </main>

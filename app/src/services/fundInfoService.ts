@@ -11,7 +11,11 @@ import type {
   FundPortfolio, 
   FundAnnouncement,
   FundRating,
-  FundManagerInfo
+  FundManagerInfo,
+  LOFRealtime,
+  ETFRealtime,
+  FundDividend,
+  FundSplit
 } from '@/types/fund';
 
 /**
@@ -290,10 +294,230 @@ export async function getFundManagers(code: string): Promise<FundManagerInfo[]> 
   }
 }
 
+// ==================== LOF 基金服务 ====================
+
+/**
+ * 获取 LOF 基金实时行情
+ * @param code - LOF 基金代码
+ * @returns LOF 基金实时行情数据
+ */
+export async function getLOFRealtime(code: string): Promise<LOFRealtime | null> {
+  try {
+    const result = await apiClient.get('fund_lof_spot_em', { symbol: code }) as any[];
+    if (result && Array.isArray(result) && result.length > 0) {
+      const data = result[0];
+      return {
+        code: data['代码'] || code,
+        name: data['名称'] || '',
+        latestPrice: Number(data['最新价']) || 0,
+        changeRate: Number(data['涨跌幅']) || 0,
+        changeValue: Number(data['涨跌额']) || 0,
+        volume: Number(data['成交量']) || 0,
+        amount: Number(data['成交额']) || 0,
+        openPrice: Number(data['开盘价']) || 0,
+        highPrice: Number(data['最高价']) || 0,
+        lowPrice: Number(data['最低价']) || 0,
+        prevClose: Number(data['昨收']) || 0,
+        bidPrice: Number(data['买价']) || 0,
+        askPrice: Number(data['卖价']) || 0,
+        bidVolume: Number(data['买量']) || 0,
+        askVolume: Number(data['卖量']) || 0,
+        turnoverRate: Number(data['换手率']) || 0,
+        premiumRate: Number(data['溢价率']) || 0,
+        unitNav: Number(data['单位净值']) || 0,
+        cumulativeNav: Number(data['累计净值']) || 0,
+        navDate: data['净值日期'] || ''
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('获取 LOF 基金行情失败:', error);
+    return null;
+  }
+}
+
+/**
+ * 获取所有 LOF 基金实时行情
+ * @returns LOF 基金实时行情列表
+ */
+export async function getAllLOFRealtime(): Promise<LOFRealtime[]> {
+  try {
+    const result = await apiClient.get('fund_lof_spot_em') as any[];
+    if (result && Array.isArray(result)) {
+      return result.map((data: any) => ({
+        code: data['代码'] || '',
+        name: data['名称'] || '',
+        latestPrice: Number(data['最新价']) || 0,
+        changeRate: Number(data['涨跌幅']) || 0,
+        changeValue: Number(data['涨跌额']) || 0,
+        volume: Number(data['成交量']) || 0,
+        amount: Number(data['成交额']) || 0,
+        openPrice: Number(data['开盘价']) || 0,
+        highPrice: Number(data['最高价']) || 0,
+        lowPrice: Number(data['最低价']) || 0,
+        prevClose: Number(data['昨收']) || 0,
+        bidPrice: Number(data['买价']) || 0,
+        askPrice: Number(data['卖价']) || 0,
+        bidVolume: Number(data['买量']) || 0,
+        askVolume: Number(data['卖量']) || 0,
+        turnoverRate: Number(data['换手率']) || 0,
+        premiumRate: Number(data['溢价率']) || 0,
+        unitNav: Number(data['单位净值']) || 0,
+        cumulativeNav: Number(data['累计净值']) || 0,
+        navDate: data['净值日期'] || ''
+      }));
+    }
+    return [];
+  } catch (error) {
+    console.error('获取 LOF 基金列表失败:', error);
+    return [];
+  }
+}
+
+// ==================== ETF 基金服务 ====================
+
+/**
+ * 获取 ETF 基金实时行情
+ * @param code - ETF 基金代码
+ * @returns ETF 基金实时行情数据
+ */
+export async function getETFRealtime(code: string): Promise<ETFRealtime | null> {
+  try {
+    const result = await apiClient.get('fund_etf_spot_em', { symbol: code }) as any[];
+    if (result && Array.isArray(result) && result.length > 0) {
+      const data = result[0];
+      return {
+        code: data['代码'] || code,
+        name: data['名称'] || '',
+        latestPrice: Number(data['最新价']) || 0,
+        changeRate: Number(data['涨跌幅']) || 0,
+        changeValue: Number(data['涨跌额']) || 0,
+        volume: Number(data['成交量']) || 0,
+        amount: Number(data['成交额']) || 0,
+        openPrice: Number(data['开盘价']) || 0,
+        highPrice: Number(data['最高价']) || 0,
+        lowPrice: Number(data['最低价']) || 0,
+        prevClose: Number(data['昨收']) || 0,
+        bidPrice: Number(data['买价']) || 0,
+        askPrice: Number(data['卖价']) || 0,
+        bidVolume: Number(data['买量']) || 0,
+        askVolume: Number(data['卖量']) || 0,
+        turnoverRate: Number(data['换手率']) || 0,
+        premiumRate: Number(data['溢价率']) || 0,
+        unitNav: Number(data['单位净值']) || 0,
+        cumulativeNav: Number(data['累计净值']) || 0,
+        navDate: data['净值日期'] || '',
+        totalMarketValue: Number(data['总市值']) || 0,
+        circulatingMarketValue: Number(data['流通市值']) || 0
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('获取 ETF 基金行情失败:', error);
+    return null;
+  }
+}
+
+/**
+ * 获取所有 ETF 基金实时行情
+ * @returns ETF 基金实时行情列表
+ */
+export async function getAllETFRealtime(): Promise<ETFRealtime[]> {
+  try {
+    const result = await apiClient.get('fund_etf_spot_em') as any[];
+    if (result && Array.isArray(result)) {
+      return result.map((data: any) => ({
+        code: data['代码'] || '',
+        name: data['名称'] || '',
+        latestPrice: Number(data['最新价']) || 0,
+        changeRate: Number(data['涨跌幅']) || 0,
+        changeValue: Number(data['涨跌额']) || 0,
+        volume: Number(data['成交量']) || 0,
+        amount: Number(data['成交额']) || 0,
+        openPrice: Number(data['开盘价']) || 0,
+        highPrice: Number(data['最高价']) || 0,
+        lowPrice: Number(data['最低价']) || 0,
+        prevClose: Number(data['昨收']) || 0,
+        bidPrice: Number(data['买价']) || 0,
+        askPrice: Number(data['卖价']) || 0,
+        bidVolume: Number(data['买量']) || 0,
+        askVolume: Number(data['卖量']) || 0,
+        turnoverRate: Number(data['换手率']) || 0,
+        premiumRate: Number(data['溢价率']) || 0,
+        unitNav: Number(data['单位净值']) || 0,
+        cumulativeNav: Number(data['累计净值']) || 0,
+        navDate: data['净值日期'] || '',
+        totalMarketValue: Number(data['总市值']) || 0,
+        circulatingMarketValue: Number(data['流通市值']) || 0
+      }));
+    }
+    return [];
+  } catch (error) {
+    console.error('获取 ETF 基金列表失败:', error);
+    return [];
+  }
+}
+
+// ==================== 基金分红送配服务 ====================
+
+/**
+ * 获取基金分红信息
+ * @param code - 基金代码
+ * @returns 基金分红信息列表
+ */
+export async function getFundDividends(code: string): Promise<FundDividend[]> {
+  try {
+    const result = await apiClient.get('fund_fh_em', { symbol: code }) as any[];
+    if (result && Array.isArray(result)) {
+      return result.map((item: any) => ({
+        fundCode: item['基金代码'] || code,
+        fundName: item['基金名称'] || '',
+        recordDate: item['权益登记日'] || '',
+        exDividendDate: item['除息交易/拆分日'] || '',
+        dividendPayDate: item['分红发放日'] || '',
+        dividendPerShare: Number(item['分红 (元/份)']) || 0,
+        totalDividend: Number(item['分红总额 (万元)']) || 0,
+        dividendType: item['分红类型'] || ''
+      }));
+    }
+    return [];
+  } catch (error) {
+    console.error('获取基金分红信息失败:', error);
+    return [];
+  }
+}
+
+/**
+ * 获取基金拆分信息
+ * @param code - 基金代码
+ * @returns 基金拆分信息列表
+ */
+export async function getFundSplits(code: string): Promise<FundSplit[]> {
+  try {
+    const result = await apiClient.get('fund_cf_em', { symbol: code }) as any[];
+    if (result && Array.isArray(result)) {
+      return result.map((item: any) => ({
+        fundCode: item['基金代码'] || code,
+        fundName: item['基金名称'] || '',
+        announcementDate: item['拆分公告日'] || '',
+        splitDate: item['拆分日'] || '',
+        splitRatio: Number(item['拆分比例']) || 0,
+        preSplitNav: Number(item['拆分前净值']) || 0,
+        postSplitNav: Number(item['拆分后净值']) || 0
+      }));
+    }
+    return [];
+  } catch (error) {
+    console.error('获取基金拆分信息失败:', error);
+    return [];
+  }
+}
+
 /**
  * 基金信息服务导出对象
  */
 export const fundInfoService = {
+  // 原有服务
   getFundOverview,
   getFundFee,
   getFundPortfolio,
@@ -301,5 +525,14 @@ export const fundInfoService = {
   getFundReports,
   getFundPersonnelAnnouncements,
   getFundRating,
-  getFundManagers
+  getFundManagers,
+  // 新增 LOF 基金服务
+  getLOFRealtime,
+  getAllLOFRealtime,
+  // 新增 ETF 基金服务
+  getETFRealtime,
+  getAllETFRealtime,
+  // 新增分红送配服务
+  getFundDividends,
+  getFundSplits
 };

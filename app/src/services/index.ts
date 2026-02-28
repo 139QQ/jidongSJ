@@ -139,3 +139,25 @@ export {
   preloadData,
   type ProgressCallback
 } from './dataLoader';
+
+// 基金信息服务模块
+export {
+  fundInfoService,
+  getFundOverview,
+  getFundFee,
+  getFundPortfolio,
+  getFundDividendAnnouncements,
+  getFundReports,
+  getFundPersonnelAnnouncements,
+  getFundRating,
+  getFundManagers,
+  // LOF 基金服务
+  getLOFRealtime,
+  getAllLOFRealtime,
+  // ETF 基金服务
+  getETFRealtime,
+  getAllETFRealtime,
+  // 分红送配服务
+  getFundDividends,
+  getFundSplits
+} from './fundInfoService';
