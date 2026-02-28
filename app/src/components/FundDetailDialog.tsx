@@ -4,7 +4,7 @@
  * @description 展示基金详情，支持编辑持有信息
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { UserFund, FundUpdateData, FundOverview, FundFee, FundPortfolio, FundAnnouncement, FundRating, FundManagerInfo } from '@/types/fund';
 import { useNavHistory } from '@/hooks/useNavHistory';
 import { fundInfoService } from '@/services/fundInfoService';
@@ -702,12 +702,23 @@ export function FundDetailDialog({ fund, open, onOpenChange, onUpdate }: FundDet
   // 错误状态
   const [errorStates, setErrorStates] = useState<Record<string, string>>({});
 
+  // 已加载的 Tab 标记，避免重复加载
+  // 使用 ref 而不是 state，因为关闭对话框时需要保留数据
+  const loadedTabsRef = useRef<Set<TabType>>(new Set());
+  // 跟踪当前基金代码，用于检测基金切换
+  const prevFundCodeRef = useRef<string | null>(null);
+
   // 获取净值历史
   const { history, loading: historyLoading, returns } = useNavHistory(fund.code, '单位净值走势', '1 年' as any);
 
-  // 加载基金详细信息（按需加载）
+  // 加载基金详细信息（按需加载，避免重复）
   const loadTabData = useCallback(async (tab: TabType) => {
-    if (tab === 'info' && !overview) {
+    // 如果该 Tab 已加载过，跳过
+    if (loadedTabsRef.current.has(tab)) {
+      return;
+    }
+
+    if (tab === 'info') {
       setLoadingStates(prev => ({ ...prev, info: true }));
       setErrorStates(prev => ({ ...prev, info: '' }));
       try {
@@ -721,6 +732,7 @@ export function FundDetailDialog({ fund, open, onOpenChange, onUpdate }: FundDet
         setFees(feeData);
         setRating(ratingData);
         setManagers(managerData);
+        loadedTabsRef.current.add('info');
       } catch (err) {
         setErrorStates(prev => ({ ...prev, info: '加载基金信息失败' }));
       } finally {
@@ -728,12 +740,13 @@ export function FundDetailDialog({ fund, open, onOpenChange, onUpdate }: FundDet
       }
     }
 
-    if (tab === 'portfolio' && !portfolio) {
+    if (tab === 'portfolio') {
       setLoadingStates(prev => ({ ...prev, portfolio: true }));
       setErrorStates(prev => ({ ...prev, portfolio: '' }));
       try {
         const portfolioData = await fundInfoService.getFundPortfolio(fund.code).catch(() => null);
         setPortfolio(portfolioData);
+        loadedTabsRef.current.add('portfolio');
       } catch (err) {
         setErrorStates(prev => ({ ...prev, portfolio: '加载持仓信息失败' }));
       } finally {
@@ -741,19 +754,20 @@ export function FundDetailDialog({ fund, open, onOpenChange, onUpdate }: FundDet
       }
     }
 
-    if (tab === 'history' && dividends.length === 0) {
+    if (tab === 'history') {
       setLoadingStates(prev => ({ ...prev, history: true }));
       setErrorStates(prev => ({ ...prev, history: '' }));
       try {
         const dividendData = await fundInfoService.getFundDividendAnnouncements(fund.code).catch(() => []);
         setDividends(dividendData);
+        loadedTabsRef.current.add('history');
       } catch (err) {
         setErrorStates(prev => ({ ...prev, history: '加载历史数据失败' }));
       } finally {
         setLoadingStates(prev => ({ ...prev, history: false }));
       }
     }
-  }, [fund.code, overview, portfolio, dividends.length]);
+  }, [fund.code]);
 
   // Tab 切换处理
   const handleTabChange = (value: string) => {
@@ -761,9 +775,26 @@ export function FundDetailDialog({ fund, open, onOpenChange, onUpdate }: FundDet
     loadTabData(value as TabType);
   };
 
-  // 对话框打开时重置状态
+  // 对话框打开时重置状态，但保留已加载的数据
   useEffect(() => {
     if (open && fund.code) {
+      // 检测基金是否切换
+      const fundCodeChanged = prevFundCodeRef.current !== fund.code;
+      
+      if (fundCodeChanged) {
+        // 基金切换时重置所有状态
+        loadedTabsRef.current = new Set();
+        setOverview(null);
+        setFees([]);
+        setPortfolio(null);
+        setDividends([]);
+        setRating(null);
+        setManagers([]);
+        setErrorStates({});
+        prevFundCodeRef.current = fund.code;
+      }
+      
+      // 只重置编辑状态，不清空数据
       setRemark(fund.remark || '');
       setHoldShares(fund.holdShares?.toString() || '');
       setCostPrice(fund.costPrice?.toString() || '');
@@ -839,15 +870,15 @@ export function FundDetailDialog({ fund, open, onOpenChange, onUpdate }: FundDet
             </div>
             <div className="flex gap-2 flex-shrink-0">
               {!isEditing ? (
-                <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="h-8">
-                  <Edit2 className="w-3.5 h-3.5 mr-1.5" />
+                <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="h-8" aria-label="编辑持有信息">
+                  <Edit2 className="w-3.5 h-3.5 mr-1.5" aria-hidden="true" />
                   编辑持有
                 </Button>
               ) : (
                 <>
                   <Button variant="outline" size="sm" onClick={() => setIsEditing(false)} className="h-8">取消</Button>
-                  <Button size="sm" onClick={handleSave} className="h-8">
-                    <Save className="w-3.5 h-3.5 mr-1.5" />
+                  <Button size="sm" onClick={handleSave} className="h-8" aria-label="保存持有信息">
+                    <Save className="w-3.5 h-3.5 mr-1.5" aria-hidden="true" />
                     保存
                   </Button>
                 </>
@@ -897,8 +928,8 @@ export function FundDetailDialog({ fund, open, onOpenChange, onUpdate }: FundDet
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>{errorStates.info}</AlertDescription>
-                    <Button variant="outline" size="sm" onClick={() => loadTabData('info')} className="mt-2">
-                      <RefreshCw className="w-3.5 h-3.5 mr-1" />重试
+                    <Button variant="outline" size="sm" onClick={() => loadTabData('info')} className="mt-2" aria-label="重试加载基金信息">
+                      <RefreshCw className="w-3.5 h-3.5 mr-1" aria-hidden="true" />重试
                     </Button>
                   </Alert>
                 ) : overview ? (
@@ -921,8 +952,8 @@ export function FundDetailDialog({ fund, open, onOpenChange, onUpdate }: FundDet
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>{errorStates.portfolio}</AlertDescription>
-                    <Button variant="outline" size="sm" onClick={() => loadTabData('portfolio')} className="mt-2">
-                      <RefreshCw className="w-3.5 h-3.5 mr-1" />重试
+                    <Button variant="outline" size="sm" onClick={() => loadTabData('portfolio')} className="mt-2" aria-label="重试加载持仓信息">
+                      <RefreshCw className="w-3.5 h-3.5 mr-1" aria-hidden="true" />重试
                     </Button>
                   </Alert>
                 ) : portfolio ? (
@@ -973,8 +1004,8 @@ export function FundDetailDialog({ fund, open, onOpenChange, onUpdate }: FundDet
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>{errorStates.history}</AlertDescription>
-                    <Button variant="outline" size="sm" onClick={() => loadTabData('history')} className="mt-2">
-                      <RefreshCw className="w-3.5 h-3.5 mr-1" />重试
+                    <Button variant="outline" size="sm" onClick={() => loadTabData('history')} className="mt-2" aria-label="重试加载历史数据">
+                      <RefreshCw className="w-3.5 h-3.5 mr-1" aria-hidden="true" />重试
                     </Button>
                   </Alert>
                 )}

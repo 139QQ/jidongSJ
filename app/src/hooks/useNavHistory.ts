@@ -1,5 +1,5 @@
 /**
- * 基金净值历史Hook
+ * 基金净值历史 Hook
  * @module hooks/useNavHistory
  * @description 获取和展示基金净值历史数据
  * 
@@ -11,16 +11,16 @@
  *   return (
  *     <div>
  *       {loading ? '加载中...' : <Chart data={history} />}
- *       <div>总收益率: {returns.totalReturn}%</div>
+ *       <div>总收益率：{returns.totalReturn}%</div>
  *     </div>
  *   );
  * }
  * ```
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { FundNAV, MoneyFundNAV } from '@/types/fund';
-import { navService } from '@/services/navService';
+import { navService, type NavPeriod, type NavIndicator } from '@/services/navService';
 
 /** 收益率数据 */
 interface ReturnsData {
@@ -30,7 +30,7 @@ interface ReturnsData {
   volatility: number;
 }
 
-/** Hook返回类型 */
+/** Hook 返回类型 */
 interface UseNavHistoryReturn {
   /** 净值历史 */
   history: FundNAV[];
@@ -44,8 +44,15 @@ interface UseNavHistoryReturn {
   refresh: () => void;
 }
 
+// 全局缓存，跨组件共享数据
+const cache = new Map<string, { data: FundNAV[]; returns: ReturnsData; timestamp: number }>();
+// 请求去重 Map，存储进行中的 Promise
+const pendingRequests = new Map<string, Promise<{ data: FundNAV[]; returns: ReturnsData }>>();
+// 缓存有效期 5 分钟
+const CACHE_TTL = 5 * 60 * 1000;
+
 /**
- * 基金净值历史Hook
+ * 基金净值历史 Hook
  * @param {string} code - 基金代码
  * @param {string} indicator - 指标类型
  * @param {string} period - 时间段
@@ -53,8 +60,8 @@ interface UseNavHistoryReturn {
  */
 export function useNavHistory(
   code: string,
-  indicator: '单位净值走势' | '累计净值走势' | '累计收益率走势' | '同类排名走势' | '同类排名百分比' = '单位净值走势',
-  period: '1月' | '3月' | '6月' | '1年' | '3年' | '5年' | '今年来' | '成立来' = '成立来'
+  indicator: NavIndicator = '单位净值走势',
+  period: NavPeriod = '成立来'
 ): UseNavHistoryReturn {
   const [history, setHistory] = useState<FundNAV[]>([]);
   const [loading, setLoading] = useState(false);
@@ -65,20 +72,75 @@ export function useNavHistory(
     maxDrawdown: 0,
     volatility: 0
   });
+  
+  // 使用 ref 跟踪是否已加载过，避免重复请求
+  const hasLoadedRef = useRef(false);
+  // 使用 ref 存储当前 cache key，用于检测参数变化
+  const prevCacheKeyRef = useRef<string | null>(null);
 
   const fetchHistory = useCallback(async () => {
     if (!code) return;
 
+    const cacheKey = `${code}-${indicator}-${period}`;
+    
+    // 检查缓存
+    const cached = cache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      setHistory(cached.data);
+      setReturns(cached.returns);
+      setError(null);
+      return;
+    }
+
+    // 检查是否有进行中的请求，有则等待该请求完成
+    const pendingRequest = pendingRequests.get(cacheKey);
+    if (pendingRequest) {
+      try {
+        setLoading(true);
+        const result = await pendingRequest;
+        setHistory(result.data);
+        setReturns(result.returns);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '获取净值历史失败');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // 发起新请求
     setLoading(true);
     setError(null);
 
-    try {
-      const data = await navService.getNavHistory(code, indicator, period);
-      setHistory(data);
+    const requestPromise = (async () => {
+      try {
+        const data = await navService.getNavHistory(code, indicator, period);
+        const returnsData = navService.calculateReturns(data);
+        
+        // 更新缓存
+        cache.set(cacheKey, {
+          data,
+          returns: returnsData,
+          timestamp: Date.now()
+        });
+        
+        return { data, returns: returnsData };
+      } catch (err) {
+        throw err;
+      } finally {
+        // 清理进行中的请求
+        pendingRequests.delete(cacheKey);
+      }
+    })();
 
-      // 计算收益率
-      const returnsData = navService.calculateReturns(data);
-      setReturns(returnsData);
+    // 存储请求到去重 Map
+    pendingRequests.set(cacheKey, requestPromise);
+
+    try {
+      const result = await requestPromise;
+      setHistory(result.data);
+      setReturns(result.returns);
     } catch (err) {
       setError(err instanceof Error ? err.message : '获取净值历史失败');
       setHistory([]);
@@ -88,8 +150,20 @@ export function useNavHistory(
   }, [code, indicator, period]);
 
   useEffect(() => {
-    fetchHistory();
-  }, [fetchHistory]);
+    const cacheKey = `${code}-${indicator}-${period}`;
+    
+    // 如果参数变化了，重置已加载标记
+    if (prevCacheKeyRef.current !== cacheKey) {
+      hasLoadedRef.current = false;
+      prevCacheKeyRef.current = cacheKey;
+    }
+    
+    // 只在未加载过或参数变化时获取数据
+    if (!hasLoadedRef.current || prevCacheKeyRef.current !== cacheKey) {
+      fetchHistory();
+      hasLoadedRef.current = true;
+    }
+  }, [fetchHistory, code, indicator, period]);
 
   return {
     history,

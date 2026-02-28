@@ -14,14 +14,13 @@ import { FundList } from '@/components/FundList';
 import { FundRankList } from '@/components/FundRankList';
 import { SettingsPanel } from '@/components/SettingsPanel';
 import { NavChart } from '@/components/NavChart';
-import { LOFList } from '@/components/LOFList';
-import { ETFList } from '@/components/ETFList';
-import { DividendList } from '@/components/DividendList';
-import { FundCompare } from '@/components/FundCompare';
+import { SpecialTopics } from '@/components/SpecialTopics';
+import { ToolsPanel } from '@/components/ToolsPanel';
 import { useFundManager } from '@/hooks/useFundManager';
 import { useNavHistory } from '@/hooks/useNavHistory';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { TradingStatus } from '@/components/TradingStatus';
 import { 
   LayoutDashboard, 
   List, 
@@ -32,9 +31,7 @@ import {
   TrendingDown,
   DollarSign,
   BarChart3,
-  PieChart,
-  FileText,
-  Gift
+  PieChart
 } from 'lucide-react';
 import './App.css';
 
@@ -50,7 +47,7 @@ function App() {
   const { history: dashboardHistory, loading: historyLoading } = useNavHistory(
     firstFundCode || '',
     '单位净值走势',
-    '1月'
+    '1 月'
   );
 
   // 刷新所有数据
@@ -60,7 +57,7 @@ function App() {
       await refreshNav();
       toast.success('数据刷新完成');
     } catch (err) {
-      toast.error('刷新失败: ' + (err instanceof Error ? err.message : '未知错误'));
+      toast.error('刷新失败：' + (err instanceof Error ? err.message : '未知错误'));
     }
   };
 
@@ -91,65 +88,67 @@ function App() {
           </Button>
         </div>
 
-        {/* 资产卡片 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 资产卡片 - 移动端优化 */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-4 md:pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">关注基金</p>
-                  <p className="text-3xl font-bold">{funds.length}</p>
+                  <p className="text-xs md:text-sm text-muted-foreground">关注基金</p>
+                  <p className="text-2xl md:text-3xl font-bold">{funds.length}</p>
                 </div>
-                <List className="w-8 h-8 text-muted-foreground" />
+                <List className="w-6 h-6 md:w-8 md:h-8 text-muted-foreground" />
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-4 md:pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">总收益</p>
-                  <p className={`text-3xl font-bold ${assets.totalProfit >= 0 ? 'text-red-500' : 'text-green-500'}`}>
+                  <p className="text-xs md:text-sm text-muted-foreground">总收益</p>
+                  <p className={`text-xl md:text-3xl font-bold ${assets.totalProfit >= 0 ? 'text-red-500' : 'text-green-500'}`}>
                     {assets.totalProfit >= 0 ? '+' : ''}¥{assets.totalProfit.toFixed(0)}
                   </p>
                 </div>
                 {assets.totalProfit >= 0 ? (
-                  <TrendingUp className="w-8 h-8 text-red-500" />
+                  <TrendingUp className="w-6 h-6 md:w-8 md:h-8 text-red-500" />
                 ) : (
-                  <TrendingDown className="w-8 h-8 text-green-500" />
+                  <TrendingDown className="w-6 h-6 md:w-8 md:h-8 text-green-500" />
                 )}
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-4 md:pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">盈利基金</p>
-                  <p className="text-3xl font-bold text-red-500">{profitFunds.length}</p>
+                  <p className="text-xs md:text-sm text-muted-foreground">盈利基金</p>
+                  <p className="text-xl md:text-3xl font-bold text-red-500">{profitFunds.length}</p>
                 </div>
-                <TrendingUp className="w-8 h-8 text-red-500" />
+                <TrendingUp className="w-6 h-6 md:w-8 md:h-8 text-red-500" />
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-4 md:pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">亏损基金</p>
-                  <p className="text-3xl font-bold text-green-500">{lossFunds.length}</p>
+                  <p className="text-xs md:text-sm text-muted-foreground">亏损基金</p>
+                  <p className="text-xl md:text-3xl font-bold text-green-500">{lossFunds.length}</p>
                 </div>
-                <TrendingDown className="w-8 h-8 text-green-500" />
+                <TrendingDown className="w-6 h-6 md:w-8 md:h-8 text-green-500" />
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* 资产概览和净值走势 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* 交易状态和资产概览 - 移动端优化 */}
+        <div className="grid grid-cols-1 gap-4 md:gap-6">
+          <TradingStatus />
+          
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
@@ -176,32 +175,33 @@ function App() {
               </div>
             </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <BarChart3 className="w-5 h-5" />
-                {firstFundCode ? `${funds[0]?.name} 净值走势` : '净值走势'}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[200px]">
-                {firstFundCode ? (
-                  <NavChart data={dashboardHistory} loading={historyLoading} />
-                ) : (
-                  <div className="h-full flex items-center justify-center text-muted-foreground">
-                    添加基金后查看净值走势
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
-        {/* 最近更新的基金 */}
+        {/* 净值走势 - 移动端优化 */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">最近更新</CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base md:text-lg flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 md:w-5 md:h-5" />
+              <span className="truncate">{firstFundCode ? `${funds[0]?.name} 净值走势` : '净值走势'}</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[180px] md:h-[200px]">
+              {firstFundCode ? (
+                <NavChart data={dashboardHistory} loading={historyLoading} />
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground">
+                  添加基金后查看净值走势
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 最近更新的基金 - 移动端优化 */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base md:text-lg">最近更新</CardTitle>
           </CardHeader>
           <CardContent>
             {funds.length === 0 ? (
@@ -209,18 +209,18 @@ function App() {
                 暂无基金，请前往"我的基金"页面添加
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                 {funds.slice(0, 6).map((fund) => (
                   <Card key={fund.code} className="bg-muted/50">
-                    <CardContent className="p-4">
+                    <CardContent className="p-3 md:p-4">
                       <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium truncate max-w-[150px]">{fund.name}</p>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium truncate text-sm md:text-base">{fund.name}</p>
                           <p className="text-xs text-muted-foreground">{fund.code}</p>
                         </div>
                         {fund.latestNav && (
-                          <div className="text-right">
-                            <p className="font-bold">{fund.latestNav.unitNav.toFixed(4)}</p>
+                          <div className="text-right flex-shrink-0 ml-2">
+                            <p className="font-bold text-sm md:text-base">{fund.latestNav.unitNav.toFixed(4)}</p>
                             {fund.latestNav.dailyGrowthRate !== undefined && (
                               <p className={`text-xs ${fund.latestNav.dailyGrowthRate >= 0 ? 'text-red-500' : 'text-green-500'}`}>
                                 {fund.latestNav.dailyGrowthRate >= 0 ? '+' : ''}{fund.latestNav.dailyGrowthRate.toFixed(2)}%
@@ -262,51 +262,44 @@ function App() {
         </div>
       </header>
 
-      {/* 主内容 */}
-      <main className="container mx-auto px-4 py-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 gap-2 lg:w-auto">
-            <TabsTrigger value="dashboard" className="flex items-center gap-2">
-              <LayoutDashboard className="w-4 h-4" />
-              <span className="hidden sm:inline">仪表盘</span>
-            </TabsTrigger>
-            <TabsTrigger value="funds" className="flex items-center gap-2">
-              <List className="w-4 h-4" />
-              <span className="hidden sm:inline">我的基金</span>
-            </TabsTrigger>
-            <TabsTrigger value="rank" className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              <span className="hidden sm:inline">排行</span>
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-2">
-              <Settings className="w-4 h-4" />
-              <span className="hidden sm:inline">设置</span>
-            </TabsTrigger>
-          </TabsList>
-          
-          {/* 第二行 Tabs - 新增功能 */}
-          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 gap-2 lg:w-auto">
-            <TabsTrigger value="lof" className="flex items-center gap-2">
-              <PieChart className="w-4 h-4" />
-              <span>LOF 基金</span>
-            </TabsTrigger>
-            <TabsTrigger value="etf" className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4" />
-              <span>ETF 基金</span>
-            </TabsTrigger>
-            <TabsTrigger value="dividend" className="flex items-center gap-2">
-              <Gift className="w-4 h-4" />
-              <span>分红送配</span>
-            </TabsTrigger>
-            <TabsTrigger value="compare" className="flex items-center gap-2">
-              <PieChart className="w-4 h-4" />
-              <span>基金对比</span>
-            </TabsTrigger>
-            <TabsTrigger value="documents" className="flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              <span>文档</span>
-            </TabsTrigger>
-          </TabsList>
+      {/* 主内容 - 移动端优化 */}
+      <main className="container mx-auto px-3 md:px-4 py-4 md:py-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          {/* 优化后的 Tabs 导航 - 6 个主功能分组 */}
+          <div className="w-full">
+            <TabsList className="w-full grid grid-cols-3 sm:grid-cols-6 gap-1 h-auto min-h-[2.5rem]">
+              <TabsTrigger value="dashboard" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 px-1 sm:px-2">
+                <LayoutDashboard className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden sm:inline">仪表盘</span>
+                <span className="sm:hidden">仪表</span>
+              </TabsTrigger>
+              <TabsTrigger value="funds" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 px-1 sm:px-2">
+                <List className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden sm:inline">我的基金</span>
+                <span className="sm:hidden">基金</span>
+              </TabsTrigger>
+              <TabsTrigger value="rank" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 px-1 sm:px-2">
+                <TrendingUp className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden sm:inline">排行</span>
+                <span className="sm:hidden">排行</span>
+              </TabsTrigger>
+              <TabsTrigger value="topics" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 px-1 sm:px-2">
+                <PieChart className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden sm:inline">专题</span>
+                <span className="sm:hidden">专题</span>
+              </TabsTrigger>
+              <TabsTrigger value="tools" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 px-1 sm:px-2">
+                <BarChart3 className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden sm:inline">工具</span>
+                <span className="sm:hidden">工具</span>
+              </TabsTrigger>
+              <TabsTrigger value="settings" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 px-1 sm:px-2">
+                <Settings className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden sm:inline">设置</span>
+                <span className="sm:hidden">设置</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="dashboard" className="mt-6">
             {loading && funds.length === 0 ? (
@@ -328,53 +321,12 @@ function App() {
             <SettingsPanel />
           </TabsContent>
           
-          <TabsContent value="lof" className="mt-6">
-            <LOFList />
+          <TabsContent value="topics" className="mt-6">
+            <SpecialTopics />
           </TabsContent>
           
-          <TabsContent value="etf" className="mt-6">
-            <ETFList />
-          </TabsContent>
-          
-          <TabsContent value="dividend" className="mt-6">
-            <DividendList />
-          </TabsContent>
-          
-          <TabsContent value="compare" className="mt-6">
-            <FundCompare />
-          </TabsContent>
-          
-          <TabsContent value="documents" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>文档中心</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <Card>
-                    <CardContent className="pt-6">
-                      <h3 className="font-medium mb-2">API 文档</h3>
-                      <p className="text-sm text-muted-foreground mb-4">查看完整的 API 接口说明</p>
-                      <a href="/docs/API_REFERENCE.md" className="text-primary hover:underline">查看 API 参考</a>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="pt-6">
-                      <h3 className="font-medium mb-2">架构文档</h3>
-                      <p className="text-sm text-muted-foreground mb-4">了解系统架构和设计</p>
-                      <a href="/docs/ARCHITECTURE.md" className="text-primary hover:underline">查看架构说明</a>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="pt-6">
-                      <h3 className="font-medium mb-2">开发计划</h3>
-                      <p className="text-sm text-muted-foreground mb-4">查看项目开发计划和进度</p>
-                      <a href="/docs/DEVELOPMENT_PLAN.md" className="text-primary hover:underline">查看开发计划</a>
-                    </CardContent>
-                  </Card>
-                </div>
-              </CardContent>
-            </Card>
+          <TabsContent value="tools" className="mt-6">
+            <ToolsPanel />
           </TabsContent>
         </Tabs>
       </main>

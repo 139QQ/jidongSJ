@@ -142,33 +142,35 @@ const AssetOverview = memo<AssetOverviewProps>(({ assets }) => {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <DollarSign className="w-5 h-5" />
-          资产概览
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base md:text-lg flex items-center gap-2">
+          <DollarSign className="w-4 h-4 md:w-5 md:h-5" />
+          <span className="hidden sm:inline">资产概览</span>
+          <span className="sm:hidden">资产</span>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="text-center p-4 bg-muted rounded-lg">
-            <div className="text-sm text-muted-foreground">总成本</div>
-            <div className="text-xl font-bold">¥{assets.totalCost.toFixed(2)}</div>
+        {/* 移动端优化：2 列网格 */}
+        <div className="grid grid-cols-2 gap-2 md:gap-4">
+          <div className="text-center p-3 md:p-4 bg-muted rounded-lg">
+            <div className="text-xs md:text-sm text-muted-foreground">总成本</div>
+            <div className="text-lg md:text-xl font-bold">¥{assets.totalCost.toFixed(2)}</div>
           </div>
-          <div className="text-center p-4 bg-muted rounded-lg">
-            <div className="text-sm text-muted-foreground">总市值</div>
-            <div className="text-xl font-bold">¥{assets.totalValue.toFixed(2)}</div>
+          <div className="text-center p-3 md:p-4 bg-muted rounded-lg">
+            <div className="text-xs md:text-sm text-muted-foreground">总市值</div>
+            <div className="text-lg md:text-xl font-bold">¥{assets.totalValue.toFixed(2)}</div>
           </div>
-          <div className="text-center p-4 bg-muted rounded-lg">
-            <div className="text-sm text-muted-foreground">总收益</div>
-            <div className={`text-xl font-bold ${getProfitColor}`}>
-              {assets.totalProfit >= 0 ? '+' : ''}¥{assets.totalProfit.toFixed(2)}
+          <div className="text-center p-3 md:p-4 bg-muted rounded-lg">
+            <div className="text-xs md:text-sm text-muted-foreground">总收益</div>
+            <div className={`text-lg md:text-xl font-bold ${getProfitColor}`}>
+              {assets.totalProfit >= 0 ? '+' : ''}¥{assets.totalProfit.toFixed(0)}
             </div>
           </div>
-          <div className="text-center p-4 bg-muted rounded-lg">
-            <div className="text-sm text-muted-foreground">收益率</div>
-            <div className={`text-xl font-bold flex items-center justify-center gap-1 ${getProfitColor}`}>
-              <ProfitIcon className="w-4 h-4" />
-              {assets.totalProfitRate >= 0 ? '+' : ''}{assets.totalProfitRate.toFixed(2)}%
+          <div className="text-center p-3 md:p-4 bg-muted rounded-lg">
+            <div className="text-xs md:text-sm text-muted-foreground">收益率</div>
+            <div className={`text-lg md:text-xl font-bold flex items-center justify-center gap-1 ${getProfitColor}`}>
+              <ProfitIcon className="w-3 h-3 md:w-4 md:h-4" />
+              {assets.totalProfitRate >= 0 ? '+' : ''}{assets.totalProfitRate.toFixed(1)}%
             </div>
           </div>
         </div>
@@ -276,17 +278,18 @@ export function FundList() {
       {/* 资产概览 - 使用优化组件 */}
       <AssetOverview assets={assets} />
 
-      {/* 操作栏 */}
+      {/* 操作栏 - 移动端优化 */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
-            <div className="relative w-full sm:w-96">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+        <CardContent className="pt-4 md:pt-6">
+          <div className="flex flex-col gap-3 md:gap-4">
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" aria-hidden="true" />
               <Input
                 placeholder="搜索基金代码或名称..."
                 value={searchKeyword}
                 onChange={(e) => setSearchKeyword(e.target.value)}
                 className="pl-10"
+                aria-label="搜索基金"
               />
             </div>
             <div className="flex gap-2">
@@ -294,29 +297,30 @@ export function FundList() {
                 variant="outline" 
                 onClick={() => handleRefreshNav()}
                 disabled={loading}
+                className="flex-1 sm:flex-none"
               >
-                <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                刷新净值
+                <RefreshCw className={`w-4 h-4 sm:mr-2 ${loading ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">刷新净值</span>
               </Button>
-              <Button onClick={() => setIsSearchOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                添加基金
+              <Button onClick={() => setIsSearchOpen(true)} className="flex-1 sm:flex-none">
+                <Plus className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">添加基金</span>
               </Button>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* 基金列表 */}
+      {/* 基金列表 - 移动端优化 */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base md:text-lg">
             我的基金 ({filteredFunds.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
           {filteredFunds.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
+            <div className="text-center py-8 md:py-12 text-muted-foreground">
               {searchKeyword ? '没有找到匹配的基金' : '暂无基金，点击"添加基金"开始关注'}
             </div>
           ) : (

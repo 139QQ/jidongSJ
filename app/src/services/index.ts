@@ -140,6 +140,27 @@ export {
   type ProgressCallback
 } from './dataLoader';
 
+// 交易时间管理模块
+export {
+  getTradingTimeConfig,
+  updateTradingTimeConfig,
+  resetTradingTimeConfig,
+  isWeekend,
+  isHoliday,
+  isTradingDay,
+  isTradingTime,
+  getNextTradingDay,
+  getPreviousTradingDay,
+  getDaysToNextTradingDay,
+  getMinutesToNextSession,
+  getTradingStatus,
+  getHolidayScheduleText,
+  type TradingSession,
+  type HolidayInfo,
+  type TradingTimeConfig,
+  type TradingStatusInfo
+} from './tradingTime';
+
 // 基金信息服务模块
 export {
   fundInfoService,

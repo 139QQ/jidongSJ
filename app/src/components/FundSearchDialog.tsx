@@ -528,12 +528,14 @@ export function FundSearchDialog({ open, onOpenChange, onSelect }: FundSearchDia
             </Button>
           </div>
 
-          {/* 预加载提示 - 优化版本 */}
-          {isPreloading && (
+          {/* 预加载进度提示 */}
+          {(isPreloading || (loading && progress > 0)) && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
               <div className="flex items-center gap-2 text-blue-600 mb-2">
                 <Zap className="w-4 h-4 animate-pulse" />
-                <span className="text-sm font-medium">正在初始化数据...</span>
+                <span className="text-sm font-medium">
+                  {isPreloading ? '正在初始化数据...' : '正在加载基金数据...'}
+                </span>
               </div>
               <Progress value={progress} className="h-2" />
               <p className="text-xs text-blue-500 mt-1">
@@ -544,16 +546,6 @@ export function FundSearchDialog({ open, onOpenChange, onSelect }: FundSearchDia
                   预计剩余时间：{Math.max(1, Math.round((100 - progress) / 20))}秒
                 </p>
               )}
-            </div>
-          )}
-
-          {/* 进度条 */}
-          {loading && progress > 0 && (
-            <div className="space-y-2">
-              <Progress value={progress} className="h-2" />
-              <p className="text-xs text-muted-foreground text-center">
-                {progressMessage} ({progress}%)
-              </p>
             </div>
           )}
 

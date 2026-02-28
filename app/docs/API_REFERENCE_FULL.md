@@ -1,6 +1,6 @@
 # AKShare 基金数据 API 完整参考
 
-生成时间：2026-02-28 17:17:23
+生成时间：2026-02-28 21:08:41
 
 官方文档：[https://akshare.akfamily.xyz/data/fund/fund_public.html](https://akshare.akfamily.xyz/data/fund/fund_public.html)
 

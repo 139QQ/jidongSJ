@@ -19,14 +19,14 @@ interface ApiNavItem {
   '申购状态'?: string;
   '赎回状态'?: string;
   '每万份收益'?: string;
-  '7日年化收益率'?: string;
+  '7 日年化收益率'?: string;
 }
 
 /** 指标类型 */
 export type NavIndicator = '单位净值走势' | '累计净值走势' | '累计收益率走势' | '同类排名走势' | '同类排名百分比';
 
 /** 时间周期 */
-export type NavPeriod = '1月' | '3月' | '6月' | '1年' | '3年' | '5年' | '今年来' | '成立来';
+export type NavPeriod = '1 月' | '1 月' | '3 月' | '6 月' | '1 年' | '3 年' | '5 年' | '今年来' | '成立来';
 
 /** 收益率计算结果 */
 export interface ReturnCalculation {
@@ -90,7 +90,7 @@ export class NavService {
       return data.map((item) => ({
         date: item['净值日期'] || '',
         tenThousandIncome: parseFloat(item['每万份收益'] ?? '0') || 0,
-        sevenDayAnnualized: parseFloat(item['7日年化收益率'] ?? '0') || 0,
+        sevenDayAnnualized: parseFloat(item['7 日年化收益率'] ?? '0') || 0,
         purchaseStatus: item['申购状态'],
         redeemStatus: item['赎回状态']
       }));
@@ -98,7 +98,7 @@ export class NavService {
   }
 
   /**
-   * 获取ETF基金历史净值
+   * 获取 ETF 基金历史净值
    */
   async getETFNavHistory(
     code: string,
@@ -115,7 +115,7 @@ export class NavService {
       });
 
       if (!Array.isArray(data)) {
-        console.warn(`获取ETF基金${code}历史净值返回格式异常`);
+        console.warn(`获取 ETF 基金${code}历史净值返回格式异常`);
         return [];
       }
 
@@ -193,7 +193,7 @@ export class NavService {
    */
   async getLatestNav(code: string): Promise<FundNAV | null> {
     try {
-      const history = await this.getNavHistory(code, '单位净值走势', '1月');
+      const history = await this.getNavHistory(code, '单位净值走势', '1 月');
       return history.length > 0 ? history[history.length - 1] : null;
     } catch (error) {
       console.error(`获取基金${code}最新净值失败:`, error);

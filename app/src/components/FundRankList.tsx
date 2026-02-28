@@ -371,49 +371,49 @@ export function FundRankList() {
             <table className="w-full text-sm">
             <thead className="sticky top-0 bg-background">
               <tr className="border-b">
-                <th className="text-left py-3 px-2">排名</th>
-                <th className="text-left py-3 px-2">基金</th>
-                <th className="text-right py-3 px-2">净值</th>
-                <th className="text-right py-3 px-2">日涨</th>
-                <th className="text-right py-3 px-2">近 1 月</th>
-                <th className="text-right py-3 px-2">近 3 月</th>
-                <th className="text-right py-3 px-2">近 1 年</th>
-                <th className="text-right py-3 px-2">今年来</th>
-                <th className="text-center py-3 px-2">操作</th>
+                <th className="text-left py-3 px-3">排名</th>
+                <th className="text-left py-3 px-4">基金</th>
+                <th className="text-right py-3 px-4">净值</th>
+                <th className="text-right py-3 px-4">日涨</th>
+                <th className="text-right py-3 px-4">近 1 月</th>
+                <th className="text-right py-3 px-4">近 3 月</th>
+                <th className="text-right py-3 px-4">近 1 年</th>
+                <th className="text-right py-3 px-4">今年来</th>
+                <th className="text-center py-3 px-3">操作</th>
               </tr>
             </thead>
             <tbody>
               {displayRanks.length > 0 ? (
                 displayRanks.map((item, index) => (
                   <tr key={item.code} className="border-b hover:bg-muted/50">
-                    <td className="py-3 px-2">
+                    <td className="py-3 px-3">
                       <Badge variant={index < 3 ? "default" : "secondary"} className="w-6 h-6 justify-center">
                         {item.rank}
                       </Badge>
                     </td>
-                    <td className="py-3 px-2">
+                    <td className="py-3 px-4">
                       <div>
                         <div className="font-medium truncate max-w-[150px]">{item.name}</div>
                         <div className="text-xs text-muted-foreground">{item.code}</div>
                       </div>
                     </td>
-                    <td className="text-right py-3 px-2">{item.unitNav.toFixed(4)}</td>
-                    <td className={`text-right py-3 px-2 ${item.dailyGrowthRate >= 0 ? 'text-red-500' : 'text-green-500'}`}>
+                    <td className="text-right py-3 px-4">{item.unitNav.toFixed(4)}</td>
+                    <td className={`text-right py-3 px-4 ${item.dailyGrowthRate >= 0 ? 'text-red-500' : 'text-green-500'}`}>
                       {item.dailyGrowthRate >= 0 ? '+' : ''}{item.dailyGrowthRate.toFixed(2)}%
                     </td>
-                    <td className={`text-right py-3 px-2 ${item.month1 >= 0 ? 'text-red-500' : 'text-green-500'}`}>
+                    <td className={`text-right py-3 px-4 ${item.month1 >= 0 ? 'text-red-500' : 'text-green-500'}`}>
                       {item.month1 >= 0 ? '+' : ''}{item.month1.toFixed(2)}%
                     </td>
-                    <td className={`text-right py-3 px-2 ${item.month3 >= 0 ? 'text-red-500' : 'text-green-500'}`}>
+                    <td className={`text-right py-3 px-4 ${item.month3 >= 0 ? 'text-red-500' : 'text-green-500'}`}>
                       {item.month3 >= 0 ? '+' : ''}{item.month3.toFixed(2)}%
                     </td>
-                    <td className={`text-right py-3 px-2 ${item.year1 >= 0 ? 'text-red-500' : 'text-green-500'}`}>
+                    <td className={`text-right py-3 px-4 ${item.year1 >= 0 ? 'text-red-500' : 'text-green-500'}`}>
                       {item.year1 >= 0 ? '+' : ''}{item.year1.toFixed(2)}%
                     </td>
-                    <td className={`text-right py-3 px-2 ${item.thisYear >= 0 ? 'text-red-500' : 'text-green-500'}`}>
+                    <td className={`text-right py-3 px-4 ${item.thisYear >= 0 ? 'text-red-500' : 'text-green-500'}`}>
                       {item.thisYear >= 0 ? '+' : ''}{item.thisYear.toFixed(2)}%
                     </td>
-                    <td className="text-center py-3 px-2">
+                    <td className="text-center py-3 px-3">
                       <Button
                         size="sm"
                         variant="ghost"
@@ -443,22 +443,22 @@ export function FundRankList() {
               {loadingMore && displayRanks.length > 0 && (
                 Array.from({ length: 3 }).map((_, index) => (
                   <tr key={`skeleton-${index}`} className="border-b">
-                    <td className="py-3 px-2">
+                    <td className="py-3 px-3">
                       <Skeleton className="w-6 h-6 rounded-full" />
                     </td>
-                    <td className="py-3 px-2">
+                    <td className="py-3 px-4">
                       <div className="space-y-1">
                         <Skeleton className="h-4 w-[120px]" />
                         <Skeleton className="h-3 w-[60px]" />
                       </div>
                     </td>
-                    <td className="py-3 px-2"><Skeleton className="h-4 w-[50px] ml-auto" /></td>
-                    <td className="py-3 px-2"><Skeleton className="h-4 w-[50px] ml-auto" /></td>
-                    <td className="py-3 px-2"><Skeleton className="h-4 w-[50px] ml-auto" /></td>
-                    <td className="py-3 px-2"><Skeleton className="h-4 w-[50px] ml-auto" /></td>
-                    <td className="py-3 px-2"><Skeleton className="h-4 w-[50px] ml-auto" /></td>
-                    <td className="py-3 px-2"><Skeleton className="h-4 w-[50px] ml-auto" /></td>
-                    <td className="py-3 px-2 text-center"><Skeleton className="h-8 w-8 mx-auto" /></td>
+                    <td className="py-3 px-4"><Skeleton className="h-4 w-[50px] ml-auto" /></td>
+                    <td className="py-3 px-4"><Skeleton className="h-4 w-[50px] ml-auto" /></td>
+                    <td className="py-3 px-4"><Skeleton className="h-4 w-[50px] ml-auto" /></td>
+                    <td className="py-3 px-4"><Skeleton className="h-4 w-[50px] ml-auto" /></td>
+                    <td className="py-3 px-4"><Skeleton className="h-4 w-[50px] ml-auto" /></td>
+                    <td className="py-3 px-4"><Skeleton className="h-4 w-[50px] ml-auto" /></td>
+                    <td className="py-3 px-3 text-center"><Skeleton className="h-8 w-8 mx-auto" /></td>
                   </tr>
                 ))
               )}
