@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { LOFList } from './LOFList';
 import { ETFList } from './ETFList';
 import { DividendList } from './DividendList';

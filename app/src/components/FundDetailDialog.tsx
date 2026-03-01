@@ -8,6 +8,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { UserFund, FundUpdateData, FundOverview, FundFee, FundPortfolio, FundAnnouncement, FundRating, FundManagerInfo } from '@/types/fund';
 import { useNavHistory } from '@/hooks/useNavHistory';
 import { fundInfoService } from '@/services/fundInfoService';
+import { serviceCache } from '@/services/cacheAdapter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -49,13 +50,14 @@ type TabType = 'overview' | 'info' | 'portfolio' | 'chart' | 'history';
  */
 function StatMiniCard({ label, value, trend }: { label: string; value: string | number; trend?: 'up' | 'down' }) {
   const colorClass = trend === 'up' ? 'text-red-500' : trend === 'down' ? 'text-green-500' : '';
+  const bgClass = trend === 'up' ? 'bg-red-50 dark:bg-red-950/30' : trend === 'down' ? 'bg-green-50 dark:bg-green-950/30' : 'bg-muted/30';
   const Icon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : null;
 
   return (
-    <div className="p-3 bg-muted/30 rounded-lg">
-      <div className="text-xs text-muted-foreground mb-1 truncate">{label}</div>
-      <div className={`text-base font-bold flex items-center gap-1 ${colorClass}`}>
-        {Icon && <Icon className="w-3 h-3 flex-shrink-0" />}
+    <div className={`p-4 rounded-lg ${bgClass}`}>
+      <div className="text-sm text-muted-foreground mb-2 truncate">{label}</div>
+      <div className={`text-lg font-bold flex items-center gap-2 ${colorClass}`}>
+        {Icon && <Icon className="w-4 h-4 flex-shrink-0" />}
         <span className="truncate">{value}</span>
       </div>
     </div>
@@ -87,39 +89,41 @@ function HoldingInfoCard({
     const costValue = fund.holdShares * fund.costPrice;
     const currentValue = fund.holdShares * fund.latestNav.unitNav;
     const profit = currentValue - costValue;
-    const profitRate = (profit / costValue) * 100;
+    const profitRate = costValue > 0 ? (profit / costValue) * 100 : 0;
     return { costValue, currentValue, profit, profitRate };
-  }, [fund]);
+  }, [fund.holdShares, fund.costPrice, fund.latestNav]);
+
+  const hasHolding = fund.holdShares && fund.costPrice && fund.latestNav;
 
   return (
     <Card className="overflow-hidden">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Wallet className="w-4 h-4" />
+      <CardHeader className="pb-4">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Wallet className="w-5 h-5" />
           持有信息
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">持有份额</Label>
+      <CardContent className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-3">
+            <Label className="text-sm text-muted-foreground">持有份额</Label>
             {isEditing ? (
               <Input
                 type="number"
                 value={holdShares}
                 onChange={(e) => setHoldShares(e.target.value)}
                 placeholder="输入持有份额"
-                className="h-9"
+                className="h-10"
               />
             ) : (
-              <div className="text-lg font-semibold truncate" title={fund.holdShares?.toLocaleString() || '未设置'}>
+              <div className="text-2xl font-bold truncate" title={fund.holdShares?.toLocaleString() || '未设置'}>
                 {fund.holdShares?.toLocaleString() || '未设置'}
-                <span className="text-xs text-muted-foreground ml-1">份</span>
+                <span className="text-sm text-muted-foreground ml-2">份</span>
               </div>
             )}
           </div>
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">成本价</Label>
+          <div className="space-y-3">
+            <Label className="text-sm text-muted-foreground">成本价 (元)</Label>
             {isEditing ? (
               <Input
                 type="number"
@@ -127,34 +131,49 @@ function HoldingInfoCard({
                 value={costPrice}
                 onChange={(e) => setCostPrice(e.target.value)}
                 placeholder="输入成本价"
-                className="h-9"
+                className="h-10"
               />
             ) : (
-              <div className="text-lg font-semibold truncate" title={`¥${fund.costPrice?.toFixed(4) || '未设置'}`}>
+              <div className="text-2xl font-bold truncate" title={`¥${fund.costPrice?.toFixed(4) || '未设置'}`}>
                 ¥{fund.costPrice?.toFixed(4) || '未设置'}
               </div>
             )}
           </div>
         </div>
 
-        {profitData && (
+        {hasHolding && profitData && (
           <>
             <Separator />
-            <div className="grid grid-cols-2 gap-3">
-              <StatMiniCard label="成本金额" value={`¥${profitData.costValue.toFixed(2)}`} />
-              <StatMiniCard label="当前市值" value={`¥${profitData.currentValue.toFixed(2)}`} />
-              <StatMiniCard 
-                label="总收益" 
-                value={`${profitData.profit >= 0 ? '+' : ''}¥${profitData.profit.toFixed(2)}`}
-                trend={profitData.profit >= 0 ? 'up' : 'down'}
-              />
-              <StatMiniCard 
-                label="收益率" 
-                value={`${profitData.profitRate >= 0 ? '+' : ''}${profitData.profitRate.toFixed(2)}%`}
-                trend={profitData.profitRate >= 0 ? 'up' : 'down'}
-              />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-muted/30 rounded-lg p-4">
+                <div className="text-sm text-muted-foreground mb-1">成本金额</div>
+                <div className="text-xl font-bold">¥{profitData.costValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              </div>
+              <div className="bg-muted/30 rounded-lg p-4">
+                <div className="text-sm text-muted-foreground mb-1">当前市值</div>
+                <div className="text-xl font-bold">¥{profitData.currentValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              </div>
+              <div className={`rounded-lg p-4 ${profitData.profit >= 0 ? 'bg-red-50 dark:bg-red-950/30' : 'bg-green-50 dark:bg-green-950/30'}`}>
+                <div className="text-sm text-muted-foreground mb-1">总收益</div>
+                <div className={`text-xl font-bold flex items-center gap-1 ${profitData.profit >= 0 ? 'text-red-500' : 'text-green-500'}`}>
+                  {profitData.profit >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                  {profitData.profit >= 0 ? '+' : ''}¥{profitData.profit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+              <div className={`rounded-lg p-4 ${profitData.profitRate >= 0 ? 'bg-red-50 dark:bg-red-950/30' : 'bg-green-50 dark:bg-green-950/30'}`}>
+                <div className="text-sm text-muted-foreground mb-1">收益率</div>
+                <div className={`text-xl font-bold flex items-center gap-1 ${profitData.profitRate >= 0 ? 'text-red-500' : 'text-green-500'}`}>
+                  {profitData.profitRate >= 0 ? '+' : ''}{profitData.profitRate.toFixed(2)}%
+                </div>
+              </div>
             </div>
           </>
+        )}
+
+        {!hasHolding && (
+          <div className="bg-muted/30 rounded-lg p-6 text-center">
+            <div className="text-muted-foreground">设置持有份额和成本价后显示收益计算</div>
+          </div>
         )}
       </CardContent>
     </Card>
@@ -199,37 +218,39 @@ function AccountInfoCard({
 }) {
   return (
     <Card className="overflow-hidden">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">账户信息</CardTitle>
+      <CardHeader className="pb-4">
+        <CardTitle className="text-lg">账户信息</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">添加时间</Label>
-            <div className="flex items-center gap-1.5 text-sm">
-              <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label className="text-sm text-muted-foreground">添加时间</Label>
+            <div className="flex items-center gap-2 text-base">
+              <Calendar className="w-4 h-4 text-muted-foreground" />
               <span className="truncate">{new Date(fund.addedAt).toLocaleDateString('zh-CN')}</span>
             </div>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">最后更新</Label>
-            <div className="flex items-center gap-1.5 text-sm">
-              <RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
+          <div className="space-y-2">
+            <Label className="text-sm text-muted-foreground">最后更新</Label>
+            <div className="flex items-center gap-2 text-base">
+              <RefreshCw className="w-4 h-4 text-muted-foreground" />
               <span className="truncate">{new Date(fund.lastUpdated).toLocaleDateString('zh-CN')}</span>
             </div>
           </div>
         </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">备注</Label>
+        <div className="space-y-2">
+          <Label className="text-sm text-muted-foreground">备注</Label>
           {isEditing ? (
             <Input
               value={remark}
               onChange={(e) => setRemark(e.target.value)}
               placeholder="添加备注..."
-              className="h-9"
+              className="h-10"
             />
           ) : (
-            <div className="text-sm truncate" title={fund.remark || '无备注'}>{fund.remark || '无备注'}</div>
+            <div className="text-base p-3 bg-muted/30 rounded-lg truncate" title={fund.remark || '无备注'}>
+              {fund.remark || '无备注'}
+            </div>
           )}
         </div>
       </CardContent>
@@ -256,14 +277,14 @@ function FundOverviewCard({ overview }: { overview: FundOverview }) {
 
   return (
     <Card className="overflow-hidden">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <FileText className="w-4 h-4" />
+      <CardHeader className="pb-4">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <FileText className="w-5 h-5" />
           基金概况
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {items.map((item) => (
             <InfoItem key={item.label} label={item.label} value={item.value} />
           ))}
@@ -279,20 +300,20 @@ function FundOverviewCard({ overview }: { overview: FundOverview }) {
 function FundRatingCard({ rating }: { rating: FundRating }) {
   return (
     <Card className="overflow-hidden">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Award className="w-4 h-4" />
+      <CardHeader className="pb-4">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Award className="w-5 h-5" />
           基金评级
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <RatingItem name="上海证券" rating={rating.shanghaiRating} />
           <RatingItem name="招商证券" rating={rating.zheshangRating} />
           <RatingItem name="济安金信" rating={rating.jianRating} />
-          <div className="text-center p-3 bg-muted/50 rounded-lg">
-            <div className="text-xs text-muted-foreground mb-2">5 星评级</div>
-            <div className="text-xl font-bold text-yellow-500">{rating.fiveStarCount}</div>
+          <div className="text-center p-4 bg-muted/50 rounded-lg">
+            <div className="text-sm text-muted-foreground mb-2">5 星评级</div>
+            <div className="text-2xl font-bold text-yellow-500">{rating.fiveStarCount}</div>
           </div>
         </div>
       </CardContent>
@@ -648,9 +669,9 @@ function DividendCard({ dividends }: { dividends: FundAnnouncement[] }) {
  */
 function InfoItem({ label, value }: { label: string; value?: string | null }) {
   return (
-    <div className="space-y-1">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
-      <div className="text-sm font-medium truncate" title={value || ''}>{value || '-'}</div>
+    <div className="space-y-1 min-w-0">
+      <Label className="text-sm text-muted-foreground">{label}</Label>
+      <div className="text-sm font-medium break-all" title={value || ''}>{value || '-'}</div>
     </div>
   );
 }
@@ -660,11 +681,11 @@ function InfoItem({ label, value }: { label: string; value?: string | null }) {
  */
 function RatingItem({ name, rating }: { name: string; rating: number }) {
   return (
-    <div className="text-center p-3 bg-muted/50 rounded-lg">
-      <div className="text-xs text-muted-foreground mb-2">{name}</div>
-      <div className="flex gap-0.5 justify-center">
+    <div className="text-center p-4 bg-muted/50 rounded-lg">
+      <div className="text-sm text-muted-foreground mb-2">{name}</div>
+      <div className="flex gap-1 justify-center">
         {[1, 2, 3, 4, 5].map((star) => (
-          <span key={star} className={`text-sm ${star <= rating ? 'text-yellow-500' : 'text-gray-200'}`}>★</span>
+          <span key={star} className={`text-lg ${star <= rating ? 'text-yellow-500' : 'text-gray-200'}`}>★</span>
         ))}
       </div>
     </div>
@@ -711,10 +732,28 @@ export function FundDetailDialog({ fund, open, onOpenChange, onUpdate }: FundDet
   // 获取净值历史
   const { history, loading: historyLoading, returns } = useNavHistory(fund.code, '单位净值走势', '1 年' as any);
 
-  // 加载基金详细信息（按需加载，避免重复）
+  // 加载基金详细信息（按需加载，使用全局缓存）
   const loadTabData = useCallback(async (tab: TabType) => {
     // 如果该 Tab 已加载过，跳过
     if (loadedTabsRef.current.has(tab)) {
+      return;
+    }
+
+    const cacheKey = `fund_detail_${tab}_${fund.code}`;
+    const cachedData = serviceCache.get<unknown>(cacheKey);
+    if (cachedData) {
+      if (tab === 'info') {
+        const data = cachedData as { overview: FundOverview | null; fees: FundFee[]; rating: FundRating | null; managers: FundManagerInfo[] };
+        setOverview(data.overview);
+        setFees(data.fees);
+        setRating(data.rating);
+        setManagers(data.managers);
+      } else if (tab === 'portfolio') {
+        setPortfolio(cachedData as FundPortfolio);
+      } else if (tab === 'history') {
+        setDividends(cachedData as FundAnnouncement[]);
+      }
+      loadedTabsRef.current.add(tab);
       return;
     }
 
@@ -728,6 +767,8 @@ export function FundDetailDialog({ fund, open, onOpenChange, onUpdate }: FundDet
           fundInfoService.getFundRating(fund.code).catch(() => null),
           fundInfoService.getFundManagers(fund.code).catch(() => [])
         ]);
+        const data = { overview: overviewData, fees: feeData, rating: ratingData, managers: managerData };
+        serviceCache.set(cacheKey, data, 30 * 60 * 1000);
         setOverview(overviewData);
         setFees(feeData);
         setRating(ratingData);
@@ -745,6 +786,9 @@ export function FundDetailDialog({ fund, open, onOpenChange, onUpdate }: FundDet
       setErrorStates(prev => ({ ...prev, portfolio: '' }));
       try {
         const portfolioData = await fundInfoService.getFundPortfolio(fund.code).catch(() => null);
+        if (portfolioData) {
+          serviceCache.set(cacheKey, portfolioData, 30 * 60 * 1000);
+        }
         setPortfolio(portfolioData);
         loadedTabsRef.current.add('portfolio');
       } catch (err) {
@@ -759,6 +803,9 @@ export function FundDetailDialog({ fund, open, onOpenChange, onUpdate }: FundDet
       setErrorStates(prev => ({ ...prev, history: '' }));
       try {
         const dividendData = await fundInfoService.getFundDividendAnnouncements(fund.code).catch(() => []);
+        if (dividendData.length > 0) {
+          serviceCache.set(cacheKey, dividendData, 30 * 60 * 1000);
+        }
         setDividends(dividendData);
         loadedTabsRef.current.add('history');
       } catch (err) {
@@ -832,37 +879,37 @@ export function FundDetailDialog({ fund, open, onOpenChange, onUpdate }: FundDet
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] p-0 overflow-hidden flex flex-col">
+      <DialogContent className="max-w-6xl max-h-[95vh] p-0 overflow-hidden flex flex-col">
         {/* 头部 - 固定高度 */}
-        <div className="p-4 border-b bg-gradient-to-r from-primary/5 to-transparent flex-shrink-0">
-          <div className="flex items-start justify-between gap-3">
+        <div className="p-5 border-b bg-gradient-to-r from-primary/5 to-transparent flex-shrink-0">
+          <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap mb-2">
-                <DialogTitle className="text-lg font-bold truncate">{fund.name}</DialogTitle>
-                <Badge variant="secondary" className="text-xs px-2 py-0.5 flex-shrink-0">{fund.code}</Badge>
-                <Badge variant="outline" className="text-xs px-2 py-0.5 flex-shrink-0">{fund.type}</Badge>
+              <div className="flex items-center gap-3 flex-wrap mb-3">
+                <DialogTitle className="text-xl font-bold truncate">{fund.name}</DialogTitle>
+                <Badge variant="secondary" className="text-sm px-2.5 py-1 flex-shrink-0">{fund.code}</Badge>
+                <Badge variant="outline" className="text-sm px-2.5 py-1 flex-shrink-0">{fund.type}</Badge>
               </div>
               {fund.latestNav && (
-                <div className="flex items-center gap-6 flex-wrap">
+                <div className="flex items-center gap-8 flex-wrap">
                   <div>
-                    <div className="text-xs text-muted-foreground">单位净值</div>
-                    <div className="text-base font-bold">{fund.latestNav.unitNav.toFixed(4)}</div>
+                    <div className="text-sm text-muted-foreground">单位净值</div>
+                    <div className="text-xl font-bold">{fund.latestNav.unitNav.toFixed(4)}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-muted-foreground">累计净值</div>
-                    <div className="text-base font-bold">{fund.latestNav.cumulativeNav.toFixed(4)}</div>
+                    <div className="text-sm text-muted-foreground">累计净值</div>
+                    <div className="text-xl font-bold">{fund.latestNav.cumulativeNav.toFixed(4)}</div>
                   </div>
                   {fund.latestNav.dailyGrowthRate !== undefined && (
                     <div>
-                      <div className="text-xs text-muted-foreground">日涨跌</div>
-                      <div className={`text-base font-bold flex items-center gap-1 ${fund.latestNav.dailyGrowthRate >= 0 ? 'text-red-500' : 'text-green-500'}`}>
-                        {fund.latestNav.dailyGrowthRate >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                      <div className="text-sm text-muted-foreground">日涨跌</div>
+                      <div className={`text-xl font-bold flex items-center gap-1 ${fund.latestNav.dailyGrowthRate >= 0 ? 'text-red-500' : 'text-green-500'}`}>
+                        {fund.latestNav.dailyGrowthRate >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
                         {fund.latestNav.dailyGrowthRate >= 0 ? '+' : ''}{fund.latestNav.dailyGrowthRate.toFixed(2)}%
                       </div>
                     </div>
                   )}
-                  <div className="ml-auto text-xs text-muted-foreground flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5" />
+                  <div className="ml-auto text-sm text-muted-foreground flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
                     {formatDate(fund.latestNav.date)}
                   </div>
                 </div>
@@ -870,15 +917,15 @@ export function FundDetailDialog({ fund, open, onOpenChange, onUpdate }: FundDet
             </div>
             <div className="flex gap-2 flex-shrink-0">
               {!isEditing ? (
-                <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="h-8" aria-label="编辑持有信息">
-                  <Edit2 className="w-3.5 h-3.5 mr-1.5" aria-hidden="true" />
+                <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="h-9" aria-label="编辑持有信息">
+                  <Edit2 className="w-4 h-4 mr-2" aria-hidden="true" />
                   编辑持有
                 </Button>
               ) : (
                 <>
-                  <Button variant="outline" size="sm" onClick={() => setIsEditing(false)} className="h-8">取消</Button>
-                  <Button size="sm" onClick={handleSave} className="h-8" aria-label="保存持有信息">
-                    <Save className="w-3.5 h-3.5 mr-1.5" aria-hidden="true" />
+                  <Button variant="outline" size="sm" onClick={() => setIsEditing(false)} className="h-9">取消</Button>
+                  <Button size="sm" onClick={handleSave} className="h-9" aria-label="保存持有信息">
+                    <Save className="w-4 h-4 mr-2" aria-hidden="true" />
                     保存
                   </Button>
                 </>
@@ -888,19 +935,19 @@ export function FundDetailDialog({ fund, open, onOpenChange, onUpdate }: FundDet
         </div>
 
         {/* Tab 导航和内容 */}
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 overflow-hidden flex flex-col">
-          <TabsList className="grid w-full grid-cols-5 rounded-none border-b h-10 flex-shrink-0">
-            <TabsTrigger value="overview" className="text-xs">概览</TabsTrigger>
-            <TabsTrigger value="info" className="text-xs">基金信息</TabsTrigger>
-            <TabsTrigger value="portfolio" className="text-xs">持仓</TabsTrigger>
-            <TabsTrigger value="chart" className="text-xs">净值走势</TabsTrigger>
-            <TabsTrigger value="history" className="text-xs">历史数据</TabsTrigger>
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 min-h-0 flex flex-col">
+          <TabsList className="grid w-full grid-cols-5 rounded-none border-b h-12 flex-shrink-0">
+            <TabsTrigger value="overview" className="text-sm">概览</TabsTrigger>
+            <TabsTrigger value="info" className="text-sm">基金信息</TabsTrigger>
+            <TabsTrigger value="portfolio" className="text-sm">持仓</TabsTrigger>
+            <TabsTrigger value="chart" className="text-sm">净值走势</TabsTrigger>
+            <TabsTrigger value="history" className="text-sm">历史数据</TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="flex-1">
-            <div className="p-4 space-y-4">
+          <ScrollArea className="flex-1 min-h-0">
+            <div className="p-6 space-y-6">
               {/* 概览 Tab */}
-              <TabsContent value="overview" className="space-y-4">
+              <TabsContent value="overview" className="space-y-6 mt-0">
                 <HoldingInfoCard 
                   fund={fund} 
                   isEditing={isEditing}
@@ -919,17 +966,17 @@ export function FundDetailDialog({ fund, open, onOpenChange, onUpdate }: FundDet
               </TabsContent>
 
               {/* 基金信息 Tab */}
-              <TabsContent value="info" className="space-y-4">
+              <TabsContent value="info" className="space-y-6 mt-0">
                 {loadingStates.info ? (
                   <div className="space-y-4">
-                    <Card><CardHeader><Skeleton className="h-5 w-24" /></CardHeader><CardContent><div className="grid grid-cols-2 gap-4">{[...Array(10)].map((_, i) => <div key={i} className="space-y-2"><Skeleton className="h-3 w-16" /><Skeleton className="h-5 w-full" /></div>)}</div></CardContent></Card>
+                    <Card><CardHeader><Skeleton className="h-6 w-32" /></CardHeader><CardContent><div className="grid grid-cols-2 gap-6">{[...Array(10)].map((_, i) => <div key={i} className="space-y-3"><Skeleton className="h-4 w-20" /><Skeleton className="h-6 w-full" /></div>)}</div></CardContent></Card>
                   </div>
                 ) : errorStates.info ? (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>{errorStates.info}</AlertDescription>
                     <Button variant="outline" size="sm" onClick={() => loadTabData('info')} className="mt-2" aria-label="重试加载基金信息">
-                      <RefreshCw className="w-3.5 h-3.5 mr-1" aria-hidden="true" />重试
+                      <RefreshCw className="w-4 h-4 mr-2" aria-hidden="true" />重试
                     </Button>
                   </Alert>
                 ) : overview ? (
@@ -945,15 +992,15 @@ export function FundDetailDialog({ fund, open, onOpenChange, onUpdate }: FundDet
               </TabsContent>
 
               {/* 持仓 Tab */}
-              <TabsContent value="portfolio" className="space-y-4">
+              <TabsContent value="portfolio" className="space-y-6 mt-0">
                 {loadingStates.portfolio ? (
-                  <div className="flex justify-center py-8"><LoadingSpinner /></div>
+                  <div className="flex justify-center py-12"><LoadingSpinner /></div>
                 ) : errorStates.portfolio ? (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>{errorStates.portfolio}</AlertDescription>
                     <Button variant="outline" size="sm" onClick={() => loadTabData('portfolio')} className="mt-2" aria-label="重试加载持仓信息">
-                      <RefreshCw className="w-3.5 h-3.5 mr-1" aria-hidden="true" />重试
+                      <RefreshCw className="w-4 h-4 mr-2" aria-hidden="true" />重试
                     </Button>
                   </Alert>
                 ) : portfolio ? (
@@ -964,15 +1011,15 @@ export function FundDetailDialog({ fund, open, onOpenChange, onUpdate }: FundDet
               </TabsContent>
 
               {/* 净值走势 Tab */}
-              <TabsContent value="chart" className="space-y-4">
+              <TabsContent value="chart" className="space-y-6 mt-0">
                 <Card className="overflow-hidden">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Activity className="w-4 h-4" />
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Activity className="w-5 h-5" />
                       净值走势（近一年）
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="h-[300px]">
+                  <CardContent className="h-[400px] min-h-[300px]">
                     {historyLoading ? (
                       <div className="flex justify-center items-center h-full"><LoadingSpinner /></div>
                     ) : history.length > 0 ? (
@@ -983,10 +1030,10 @@ export function FundDetailDialog({ fund, open, onOpenChange, onUpdate }: FundDet
                   </CardContent>
                 </Card>
                 <Card className="overflow-hidden">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">收益指标</CardTitle>
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-lg">收益指标</CardTitle>
                   </CardHeader>
-                  <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <StatMiniCard label="总收益" value={`${returns.totalReturn >= 0 ? '+' : ''}${returns.totalReturn.toFixed(2)}%`} trend="up" />
                     <StatMiniCard label="年化收益" value={`${returns.annualizedReturn >= 0 ? '+' : ''}${returns.annualizedReturn.toFixed(2)}%`} trend="up" />
                     <StatMiniCard label="最大回撤" value={`${returns.maxDrawdown.toFixed(2)}%`} trend="down" />
@@ -996,16 +1043,16 @@ export function FundDetailDialog({ fund, open, onOpenChange, onUpdate }: FundDet
               </TabsContent>
 
               {/* 历史数据 Tab */}
-              <TabsContent value="history" className="space-y-4">
+              <TabsContent value="history" className="space-y-6 mt-0">
                 <HistoryNavCard history={history} />
                 {dividends.length > 0 && <DividendCard dividends={dividends} />}
-                {loadingStates.history && <div className="flex justify-center py-4"><LoadingSpinner /></div>}
+                {loadingStates.history && <div className="flex justify-center py-6"><LoadingSpinner /></div>}
                 {errorStates.history && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>{errorStates.history}</AlertDescription>
                     <Button variant="outline" size="sm" onClick={() => loadTabData('history')} className="mt-2" aria-label="重试加载历史数据">
-                      <RefreshCw className="w-3.5 h-3.5 mr-1" aria-hidden="true" />重试
+                      <RefreshCw className="w-4 h-4 mr-2" aria-hidden="true" />重试
                     </Button>
                   </Alert>
                 )}

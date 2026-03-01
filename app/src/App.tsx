@@ -157,22 +157,29 @@ function App() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center p-4 bg-muted rounded-lg">
-                  <span className="text-muted-foreground">总成本</span>
-                  <span className="text-xl font-bold">¥{assets.totalCost.toFixed(2)}</span>
+              {funds.length === 0 || assets.totalCost === 0 ? (
+                <div className="text-center py-6 text-muted-foreground bg-muted/30 rounded-lg">
+                  添加基金并设置持有信息后显示资产概览
                 </div>
-                <div className="flex justify-between items-center p-4 bg-muted rounded-lg">
-                  <span className="text-muted-foreground">总市值</span>
-                  <span className="text-xl font-bold">¥{assets.totalValue.toFixed(2)}</span>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center p-4 bg-muted rounded-lg">
+                    <span className="text-muted-foreground">总成本</span>
+                    <span className="text-xl font-bold">¥{assets.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-4 bg-muted rounded-lg">
+                    <span className="text-muted-foreground">总市值</span>
+                    <span className="text-xl font-bold">¥{assets.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className={`flex justify-between items-center p-4 rounded-lg ${assets.totalProfitRate >= 0 ? 'bg-red-50 dark:bg-red-950/30' : 'bg-green-50 dark:bg-green-950/30'}`}>
+                    <span className={assets.totalProfitRate >= 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}>总收益</span>
+                    <span className={`text-xl font-bold ${assets.totalProfit >= 0 ? 'text-red-500' : 'text-green-500'}`}>
+                      {assets.totalProfit >= 0 ? '+' : ''}¥{assets.totalProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      <span className="text-sm ml-2">({assets.totalProfitRate >= 0 ? '+' : ''}{assets.totalProfitRate.toFixed(2)}%)</span>
+                    </span>
+                  </div>
                 </div>
-                <div className={`flex justify-between items-center p-4 bg-muted rounded-lg ${assets.totalProfitRate >= 0 ? 'text-red-500' : 'text-green-500'}`}>
-                  <span>收益率</span>
-                  <span className="text-xl font-bold">
-                    {assets.totalProfitRate >= 0 ? '+' : ''}{assets.totalProfitRate.toFixed(2)}%
-                  </span>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </div>

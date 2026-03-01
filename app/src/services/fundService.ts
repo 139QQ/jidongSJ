@@ -219,6 +219,32 @@ export class FundService {
   }
 
   /**
+   * 根据基金代码获取单只基金信息
+   * 优先从缓存获取，避免每次都请求全量数据
+   */
+  async getFundByCode(code: string): Promise<FundRealtime | null> {
+    if (!code || code.trim().length === 0) {
+      return null;
+    }
+
+    const cacheKey = `fund_single_${code}`;
+    const cached = serviceCache.get<FundRealtime>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const allFunds = await this.getOpenFundList();
+    const fund = allFunds.find(f => f.code === code);
+    
+    if (fund) {
+      serviceCache.set(cacheKey, fund, 5 * 60 * 1000);
+      return fund;
+    }
+    
+    return null;
+  }
+
+  /**
    * 获取货币基金列表
    */
   async getMoneyFundList(): Promise<unknown[]> {
@@ -264,6 +290,7 @@ export class FundService {
    * 缓存策略：
    * - 非交易时间：缓存 2 小时
    * - 交易时间：缓存 10 分钟
+   * - API 失败时返回过期缓存
    * 
    * @param symbol 基金类型
    * @param limit 数量限制
@@ -322,6 +349,11 @@ export class FundService {
       return ranks;
     } catch (error) {
       console.error('[FundService] 获取基金排行失败:', error);
+      const staleCache = rankingCache.get<FundRank[]>(cacheKey);
+      if (staleCache) {
+        console.log('[FundService] 返回过期缓存数据');
+        return staleCache;
+      }
       throw error;
     }
   }
@@ -353,6 +385,7 @@ export class FundService {
    * 缓存策略：
    * - 非交易时间：缓存 30 分钟
    * - 交易时间：缓存 1 分钟（实时性要求高）
+   * - API 失败时返回过期缓存
    * 
    * @param symbol 基金类型
    * @returns 基金估算净值列表
@@ -398,6 +431,11 @@ export class FundService {
       return estimates;
     } catch (error) {
       console.error('获取基金估算净值失败:', error);
+      const staleCache = realtimeCache.get<FundEstimate[]>(cacheKey);
+      if (staleCache) {
+        console.log('[FundService] 返回过期缓存数据');
+        return staleCache;
+      }
       throw error;
     }
   }

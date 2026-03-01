@@ -11,7 +11,7 @@
  * 5. 净值更新采用异步非阻塞模式
  */
 
-import type { UserFund, FundUpdateData, FundQueryOptions } from '@/types/fund';
+import type { UserFund, FundUpdateData, FundQueryOptions, FundNAV } from '@/types/fund';
 import { FundStatus, FundType } from '@/types/fund';
 import { storage, StorageKey } from './storage';
 import { navService } from './navService';
@@ -26,7 +26,7 @@ export type { FundUpdateData, FundQueryOptions };
  */
 export interface NavUpdateEvent {
   code: string;
-  nav: any;
+  nav: FundNAV | undefined;
   timestamp: string;
 }
 
@@ -131,17 +131,12 @@ export class FundManager {
   private async getFundInfo(code: string): Promise<{
     code: string;
     name: string;
-    latestNav?: {
-      unitNav: number;
-      cumulativeNav: number;
-      date: string;
-      dailyGrowthRate: number;
-    };
+    latestNav?: FundNAV;
   } | null> {
     const singleCached = persistentCache.get<{
       code: string;
       name: string;
-      latestNav?: any;
+      latestNav?: FundNAV;
     }>(`fund_${code}`);
     if (singleCached) {
       console.log(`[FundManager] 从持久化缓存获取基金${code}信息`);
@@ -151,7 +146,7 @@ export class FundManager {
     const memCached = cache.get<{
       code: string;
       name: string;
-      latestNav?: any;
+      latestNav?: FundNAV;
     }>(`fund_${code}`);
     if (memCached) {
       console.log(`[FundManager] 从内存缓存获取基金${code}信息`);
@@ -160,8 +155,7 @@ export class FundManager {
     
     try {
       console.log(`[FundManager] 通过 fundService 获取基金${code}信息`);
-      const allFunds = await fundService.getOpenFundList();
-      const fund = allFunds.find(f => f.code === code);
+      const fund = await fundService.getFundByCode(code);
       
       if (!fund) {
         console.warn(`[FundManager] 未找到基金${code}`);
@@ -191,7 +185,7 @@ export class FundManager {
 
   private async fetchLatestNav(code: string): Promise<void> {
     try {
-      const cachedNav = cache.get<any>(`nav_${code}`);
+      const cachedNav = cache.get<FundNAV>(`nav_${code}`);
       if (cachedNav) {
         console.log(`[FundManager] 从缓存获取基金${code}净值`);
         this.updateFundNav(code, cachedNav);
@@ -208,7 +202,7 @@ export class FundManager {
     }
   }
 
-  private updateFundNav(code: string, nav: any): void {
+  private updateFundNav(code: string, nav: FundNAV | undefined): void {
     const fund = this.funds.get(code);
     if (fund) {
       fund.latestNav = nav;
@@ -351,7 +345,7 @@ export class FundManager {
     }
 
     try {
-      const cachedNav = cache.get<any>(`nav_${code}`);
+      const cachedNav = cache.get<FundNAV>(`nav_${code}`);
       if (cachedNav) {
         console.log(`[FundManager] 从缓存获取基金${code}净值`);
         fund.latestNav = cachedNav;
@@ -377,16 +371,14 @@ export class FundManager {
   }
 
   async refreshAllNavs(): Promise<number> {
-    let count = 0;
     const funds = this.getAllFunds();
+    if (funds.length === 0) return 0;
 
-    for (const fund of funds) {
-      const updated = await this.refreshFundNav(fund.code);
-      if (updated) {
-        count++;
-      }
-    }
+    const results = await Promise.allSettled(
+      funds.map(fund => this.refreshFundNav(fund.code))
+    );
 
+    const count = results.filter(r => r.status === 'fulfilled' && r.value !== null).length;
     console.log(`[FundManager] 成功刷新 ${count}/${funds.length} 只基金净值`);
     return count;
   }
@@ -405,7 +397,7 @@ export class FundManager {
     const costValue = fund.holdShares * fund.costPrice;
     const currentValue = fund.holdShares * fund.latestNav.unitNav;
     const totalProfit = currentValue - costValue;
-    const profitRate = (totalProfit / costValue) * 100;
+    const profitRate = costValue > 0 ? (totalProfit / costValue) * 100 : 0;
 
     return {
       totalProfit,
@@ -420,15 +412,18 @@ export class FundManager {
     totalValue: number;
     totalProfit: number;
     totalProfitRate: number;
+    fundCount: number;
   } {
     const funds = this.getAllFunds();
     let totalCost = 0;
     let totalValue = 0;
+    let fundCount = 0;
 
     for (const fund of funds) {
-      if (fund.holdShares && fund.costPrice && fund.latestNav) {
+      if (fund.holdShares && fund.costPrice && fund.latestNav && fund.holdShares > 0 && fund.costPrice > 0) {
         totalCost += fund.holdShares * fund.costPrice;
         totalValue += fund.holdShares * fund.latestNav.unitNav;
+        fundCount++;
       }
     }
 
@@ -439,7 +434,8 @@ export class FundManager {
       totalCost,
       totalValue,
       totalProfit,
-      totalProfitRate
+      totalProfitRate,
+      fundCount
     };
   }
 

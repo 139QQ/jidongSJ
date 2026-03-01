@@ -1,10 +1,41 @@
 # 项目开发计划与优化文档
 
-更新时间：2026-02-28
+更新时间：2026-03-01
 
 ---
 
-## 一、已完成改进 (2026-02-28)
+## 一、已完成改进 (2026-03-01)
+
+### 代码质量修复
+
+#### 1. 类型安全问题修复
+- `NavUpdateEvent.nav` 类型从 `any` 改为 `FundNAV | undefined`
+- `fetchLatestNav`、`refreshFundNav` 方法缓存类型改为强类型
+- 涉及文件：`src/services/fundManager.ts`
+
+#### 2. 性能优化 - addFund
+- 新增 `getFundByCode` 方法获取单只基金信息
+- 避免每次添加基金都请求全量数据
+- 单只基金缓存 5 分钟
+- 涉及文件：`src/services/fundService.ts`、`src/services/fundManager.ts`
+
+#### 3. 性能优化 - refreshAllNavs
+- 从串行刷新改为 `Promise.allSettled` 并发刷新
+- 多只基金净值同时更新，响应时间大幅缩短
+- 涉及文件：`src/services/fundManager.ts`
+
+#### 4. 错误处理增强
+- `getFundRank` 和 `getFundEstimate` 增加过期缓存降级机制
+- API 失败时返回过期缓存，避免空白页面
+- 涉及文件：`src/services/fundService.ts`
+
+#### 5. 构建错误修复
+- 修复 `SpecialTopics.tsx` 未使用导入
+- 修复 `example.test.tsx` 未使用变量
+
+---
+
+## 二、已完成改进 (2026-02-28)
 
 ### 1. 新增 LOF 基金支持
 
@@ -92,10 +123,15 @@
 - [x] 添加 LOF 基金支持 (fund_lof_spot_em)
 - [x] 添加 ETF 实时行情 (fund_etf_spot_em)
 - [x] 完善分红送配功能 (fund_fh_em, fund_cf_em)
-- [ ] 添加前端组件支持
-  - [ ] LOF 基金列表组件
-  - [ ] ETF 基金列表组件
-  - [ ] 分红送配详情组件
+- [x] 添加前端组件支持
+  - [x] LOF 基金列表组件
+  - [x] ETF 基金列表组件
+  - [x] 分红送配详情组件
+- [x] 代码质量优化
+  - [x] 类型安全问题修复
+  - [x] 性能优化 - addFund
+  - [x] 性能优化 - refreshAllNavs
+  - [x] 错误处理增强
 
 ### 第二阶段：数据分析增强
 
@@ -192,11 +228,13 @@
 
 ## 六、版本计划
 
-### v1.5.0 (当前版本)
+### v1.5.1 (当前版本)
 
-- 新增 LOF 基金支持
-- 新增 ETF 实时行情
-- 新增分红送配功能
+- 类型安全问题修复
+- 性能优化 - addFund
+- 性能优化 - refreshAllNavs
+- 错误处理增强
+- 构建错误修复
 
 ### v1.6.0 (计划 2026-03)
 

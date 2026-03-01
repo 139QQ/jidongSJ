@@ -3,7 +3,7 @@
  * 展示如何使用 Vitest + Testing Library 测试 React 组件
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { Button } from '../components/ui/button';
 
@@ -36,7 +36,6 @@ describe('UI 组件测试', () => {
 
     it('应该支持不同的变体', () => {
       const { container: defaultBtn } = render(<Button>默认</Button>);
-      const { container: primaryBtn } = render(<Button variant="default">主要</Button>);
       const { container: outlineBtn } = render(<Button variant="outline">边框</Button>);
       
       expect(defaultBtn.firstChild).toHaveClass('bg-primary');
